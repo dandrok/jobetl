@@ -1,6 +1,6 @@
 # JobETL
 
-`jobetl` is a scheduled job-hunting pipeline for one-person use.
+`jobetl` is a scheduled job-hunting pipeline.
 
 The first version is built around this flow:
 
