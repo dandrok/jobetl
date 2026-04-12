@@ -26,6 +26,31 @@ export interface MatchCandidate {
   match: MatchResult;
 }
 
+export type JobStatus =
+  | "discovered"
+  | "fetched"
+  | "scored"
+  | "matched"
+  | "rejected"
+  | "error";
+
+export interface StoredJob {
+  externalId: string;
+  source: JobSource;
+  url: string;
+  title: string;
+  company: string;
+  salaryText?: string;
+  location?: string;
+  offerMarkdown?: string;
+  matchScore?: number;
+  matchReason?: string;
+  summary?: string;
+  status: JobStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SearchFilters {
   keyword?: string;
   categorySlug?: string;
@@ -45,10 +70,9 @@ export interface SourceConfig {
 }
 
 export interface RunConfig {
-  notionDatabaseId: string;
+  databasePath: string;
   resumeMarkdownPath: string;
   matchThreshold: number;
-  dryRun: boolean;
   sources: {
     justjoinit: SourceConfig;
   };
@@ -56,6 +80,5 @@ export interface RunConfig {
 
 export interface RuntimeEnv {
   jinaApiKey: string;
-  notionApiKey: string;
   deepseekApiKey: string;
 }

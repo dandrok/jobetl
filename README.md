@@ -1,14 +1,17 @@
 # JobETL
 
-`jobetl` is a scheduled job-hunting pipeline.
+`jobetl` is a local-first job scraping and matching tool.
 
-The first version is built around this flow:
+It collects job offers from selected websites, turns full offers into markdown, compares them against your CV, and stores the results in a local SQLite database so you can review matched jobs in one place.
+
+The current flow is:
 
 1. Search `justjoin.it` with source-side filters.
 2. Collect offer links and basic listing metadata.
-3. Fetch each offer page through Jina Reader as markdown.
-4. Compare the offer markdown against your CV markdown with DeepSeek via AI SDK.
-5. Save only strong matches into a Notion database.
+3. Save discovered listings into a local SQLite database.
+4. Fetch each offer page through Jina Reader as markdown.
+5. Compare the offer markdown against your CV markdown with DeepSeek via AI SDK.
+6. Update the same SQLite rows as `matched` or `rejected`.
 
 ## MVP scope
 
@@ -16,8 +19,8 @@ The first version is built around this flow:
 - Source: `justjoin.it`
 - Offer extraction: Jina Reader
 - Matching: AI SDK + DeepSeek
-- Storage: Notion database
-- Execution: local CLI, cron, or GitHub Actions
+- Storage: local SQLite database
+- Execution: local CLI first
 
 ## Project layout
 
@@ -28,9 +31,10 @@ src/
   env.ts
   jina/
   matching/
-  notion/
   pipeline/
+  report.ts
   sources/
+  storage/
 tests/
 docs/
 ```
@@ -50,27 +54,24 @@ Copy `.env.example` values into your own environment source.
 Required variables:
 
 - `JINA_API_KEY`
-- `NOTION_API_KEY`
 - `DEEPSEEK_API_KEY`
 
 For local runs you can export them in your shell:
 
 ```bash
 export JINA_API_KEY=...
-export NOTION_API_KEY=...
 export DEEPSEEK_API_KEY=...
 ```
 
-For GitHub Actions, store them as repository secrets.
-
 ### 3. Add your CV markdown
 
-Create `cv.md` based on [`cv.example.md`](/home/dandrok/git/jobetl/cv.example.md) and point `resumeMarkdownPath` at it in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
+Create `cv.md` based on [`cv.example.md`](/home/dandrok/git/jobetl/cv.example.md) and keep `resumeMarkdownPath` pointed at it in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
 
 ### 4. Set your preferences
 
 Edit [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts):
 
+- `databasePath`
 - `keyword`
 - `categorySlug`
 - `location`
@@ -79,29 +80,39 @@ Edit [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts):
 - `withSalaryOnly`
 - `matchThreshold`
 - `maxListings`
-- `dryRun`
-- `notionDatabaseId`
 
-## Notion database schema
+## Local SQLite storage
 
-Create a database or data source with these properties:
+The active store is a local SQLite file, by default:
 
-- `Job Title` as `Title`
-- `Company` as `Rich text`
-- `Salary` as `Rich text`
-- `Summary` as `Rich text`
-- `Offer URL` as `URL`
-- `Source` as `Select`
-- `Match Score` as `Number`
-- `Match Reason` as `Rich text`
-- `Saved At` as `Date`
-- `External ID` as `Rich text`
+```text
+./data/jobetl.db
+```
 
-The dedupe check uses `External ID`.
+The `jobs` table stores:
+
+- external id
+- source
+- url
+- title
+- company
+- salary text
+- location
+- offer markdown
+- match score
+- match reason
+- summary
+- status
+- created / updated timestamps
+
+Status values currently used:
+
+- `discovered`
+- `fetched`
+- `matched`
+- `rejected`
 
 ## Running locally
-
-Dry-run is controlled in config.
 
 ```bash
 npm run dev
@@ -110,9 +121,18 @@ npm run dev
 Expected result:
 
 - the pipeline scans listing pages,
-- scores matching offers,
-- skips duplicates already present in Notion,
-- prints a JSON summary with `scanned`, `matched`, and `saved`.
+- stores listings in SQLite,
+- fetches and scores each offer,
+- updates rows as `matched` or `rejected`,
+- prints a JSON summary with `scanned`, `fetched`, `matched`, and `stored`.
+
+## Reviewing local matches
+
+```bash
+npm run report
+```
+
+This prints the best locally stored matches from SQLite.
 
 ## Verification
 
@@ -121,43 +141,17 @@ npm test
 npm run build
 ```
 
-## GitHub Actions example
-
-```yaml
-name: jobetl
-
-on:
-  schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
-
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run dev
-        env:
-          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-```
-
 ## Current limitations
 
 - The `justjoin.it` adapter is intentionally narrow and should be hardened against future markup changes.
-- The current dedupe path assumes the configured Notion id works with both page creation and data source querying.
+- The current pipeline processes offers sequentially.
 - The pipeline does not yet implement retries, backoff, or result caching.
-- Offer detail fetching and scoring are sequential in v1.
+- Local SQLite is the active store; Notion export is intentionally deferred.
 
 ## Next extensions
 
+- Add a Notion export or sync layer on top of the local database
 - Add more source adapters behind the same interface
 - Expand source-side filter coverage
-- Add retry/backoff for Jina, DeepSeek, and Notion
-- Add dry-run reports for manual review
+- Add retry/backoff for Jina and DeepSeek
+- Add GitHub Actions once the local workflow is stable

@@ -1,10 +1,9 @@
 import type { RunConfig } from "./types.js";
 
 export const config: RunConfig = {
-  notionDatabaseId: "replace-me",
+  databasePath: "./data/jobetl.db",
   resumeMarkdownPath: "./cv.md",
   matchThreshold: 0.78,
-  dryRun: true,
   sources: {
     justjoinit: {
       enabled: true,

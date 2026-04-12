@@ -1,7 +1,7 @@
 {
   "name": "jobetl",
   "version": "1.0.0",
-  "description": "Scheduled job lead crawler that matches offers against a CV and saves strong matches to Notion.",
+  "description": "Scheduled job lead crawler that matches offers against a CV and stores results in a local SQLite database.",
   "license": "ISC",
   "author": "dandrok",
   "type": "module",
@@ -9,14 +9,15 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "tsx src/cli.ts",
+    "report": "tsx src/report.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.29",
-    "@notionhq/client": "^5.17.0",
     "ai": "^6.0.158",
     "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

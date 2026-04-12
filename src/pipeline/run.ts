@@ -3,15 +3,16 @@ import { readFile } from "node:fs/promises";
 import { loadRuntimeEnv } from "../env.js";
 import { JinaReaderClient } from "../jina/client.js";
 import { DeepSeekMatcher } from "../matching/deepseek-matcher.js";
-import { NotionJobRepository } from "../notion/client.js";
 import { selectMatches } from "./select-matches.js";
 import { JustJoinItAdapter } from "../sources/justjoinit.js";
+import { SQLiteJobRepository } from "../storage/sqlite-job-repository.js";
 import type { JobOffer, MatchCandidate, RunConfig } from "../types.js";
 
 export interface RunSummary {
   scanned: number;
+  fetched: number;
   matched: number;
-  saved: number;
+  stored: number;
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -34,47 +35,34 @@ export async function runPipeline(config: RunConfig): Promise<RunSummary> {
   const resumeMarkdown = await readFile(config.resumeMarkdownPath, "utf8");
   const jina = new JinaReaderClient(env.jinaApiKey);
   const matcher = new DeepSeekMatcher(env.deepseekApiKey);
-  const notion = new NotionJobRepository(env.notionApiKey);
+  const repository = new SQLiteJobRepository(config.databasePath);
   const candidates: MatchCandidate[] = [];
+  let fetched = 0;
 
   for (const listing of listings) {
+    repository.upsertDiscoveredJob(listing);
     const offerMarkdown = await jina.fetchMarkdown(listing.url);
+    repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+    fetched += 1;
     const offer: JobOffer = { ...listing, offerMarkdown };
     const match = await matcher.scoreOffer(offer, resumeMarkdown);
-    candidates.push({
+    const candidate = {
       job: offer,
       match: {
         ...match,
         shouldSave: match.score >= config.matchThreshold
       }
-    });
+    };
+    repository.saveScoredJob(candidate);
+    candidates.push(candidate);
   }
 
   const selected = selectMatches(candidates, config.matchThreshold);
-  let saved = 0;
-
-  for (const candidate of selected) {
-    const exists = await notion.hasExternalId(
-      config.notionDatabaseId,
-      candidate.job.externalId
-    );
-
-    if (exists) {
-      continue;
-    }
-
-    if (config.dryRun) {
-      saved += 1;
-      continue;
-    }
-
-    await notion.createJob(config.notionDatabaseId, candidate);
-    saved += 1;
-  }
 
   return {
     scanned: listings.length,
+    fetched,
     matched: selected.length,
-    saved
+    stored: repository.listJobs().length
   };
 }

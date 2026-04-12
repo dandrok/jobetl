@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import type { RuntimeEnv } from "./types.js";
 
 function requireEnv(name: string): string {
@@ -12,7 +14,6 @@ function requireEnv(name: string): string {
 export function loadRuntimeEnv(): RuntimeEnv {
   return {
     jinaApiKey: requireEnv("JINA_API_KEY"),
-    notionApiKey: requireEnv("NOTION_API_KEY"),
     deepseekApiKey: requireEnv("DEEPSEEK_API_KEY")
   };
 }
