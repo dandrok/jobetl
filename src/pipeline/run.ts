@@ -4,6 +4,7 @@ import { loadRuntimeEnv } from "../env.js";
 import { JinaReaderClient } from "../jina/client.js";
 import { DeepSeekMatcher } from "../matching/deepseek-matcher.js";
 import { selectMatches } from "./select-matches.js";
+import type { ProgressReporter } from "../progress/ora-progress-reporter.js";
 import { JustJoinItAdapter } from "../sources/justjoinit.js";
 import { SQLiteJobRepository } from "../storage/sqlite-job-repository.js";
 import type { JobOffer, MatchCandidate, RunConfig } from "../types.js";
@@ -24,7 +25,10 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
-export async function runPipeline(config: RunConfig): Promise<RunSummary> {
+export async function runPipeline(
+  config: RunConfig,
+  progress?: ProgressReporter
+): Promise<RunSummary> {
   const env = loadRuntimeEnv();
   const adapter = new JustJoinItAdapter();
   const listingUrl = adapter.buildSearchUrl(config.sources.justjoinit.filters);
@@ -38,13 +42,16 @@ export async function runPipeline(config: RunConfig): Promise<RunSummary> {
   const repository = new SQLiteJobRepository(config.databasePath);
   const candidates: MatchCandidate[] = [];
   let fetched = 0;
+  progress?.start(listings.length);
 
-  for (const listing of listings) {
+  for (const [index, listing] of listings.entries()) {
     repository.upsertDiscoveredJob(listing);
+    progress?.update(index + 1, listings.length, "Fetching markdown", listing.company);
     const offerMarkdown = await jina.fetchMarkdown(listing.url);
     repository.saveFetchedOffer(listing.externalId, offerMarkdown);
     fetched += 1;
     const offer: JobOffer = { ...listing, offerMarkdown };
+    progress?.update(index + 1, listings.length, "Scoring match", listing.company);
     const match = await matcher.scoreOffer(offer, resumeMarkdown);
     const candidate = {
       job: offer,
@@ -54,6 +61,12 @@ export async function runPipeline(config: RunConfig): Promise<RunSummary> {
       }
     };
     repository.saveScoredJob(candidate);
+    progress?.update(
+      index + 1,
+      listings.length,
+      candidate.match.shouldSave ? "Stored matched offer" : "Stored rejected offer",
+      listing.company
+    );
     candidates.push(candidate);
   }
 

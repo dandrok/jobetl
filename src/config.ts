@@ -8,7 +8,7 @@ export const config: RunConfig = {
     justjoinit: {
       enabled: true,
       baseUrl: "https://justjoin.it",
-      maxListings: 25,
+      maxListings: 5, // TODO: we put 5 here only for testing
       filters: {
         keyword: "node.js",
         categorySlug: "javascript",
