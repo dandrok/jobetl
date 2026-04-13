@@ -7,7 +7,7 @@ const progress = new OraProgressReporter();
 async function main(): Promise<void> {
   const summary = await runPipeline(config, progress);
   progress.succeed(
-    `Done: scanned=${summary.scanned} fetched=${summary.fetched} matched=${summary.matched} stored=${summary.stored}`
+    `Done: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
   );
   console.log(JSON.stringify(summary, null, 2));
 }

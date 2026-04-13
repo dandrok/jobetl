@@ -74,6 +74,37 @@ export class SQLiteJobRepository {
     return Boolean(row);
   }
 
+  getJobStatus(externalId: string): StoredJob["status"] | undefined {
+    const row = this.database
+      .prepare("SELECT status FROM jobs WHERE external_id = ? LIMIT 1")
+      .get(externalId) as { status: StoredJob["status"] } | undefined;
+
+    return row?.status;
+  }
+
+  markJobFetching(externalId: string): void {
+    this.updateJobStatus(externalId, "fetching");
+  }
+
+  markJobScoring(externalId: string): void {
+    this.updateJobStatus(externalId, "scoring");
+  }
+
+  markJobError(externalId: string): void {
+    this.updateJobStatus(externalId, "error");
+  }
+
+  private updateJobStatus(externalId: string, status: StoredJob["status"]): void {
+    const now = new Date().toISOString();
+    this.database
+      .prepare(`
+        UPDATE jobs
+        SET status = ?, updated_at = ?
+        WHERE external_id = ?
+      `)
+      .run(status, now, externalId);
+  }
+
   upsertDiscoveredJob(job: JobListing): void {
     const now = new Date().toISOString();
     this.database

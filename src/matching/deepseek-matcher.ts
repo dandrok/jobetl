@@ -24,7 +24,6 @@ export class DeepSeekMatcher {
       prompt: [
         "You are scoring how well a job offer matches a software engineer CV.",
         "Return a score between 0 and 1, a short reason, and a short summary.",
-        "Prefer backend, ETL, Node.js, TypeScript, automation, and data-related overlap when present.",
         "",
         "CV MARKDOWN:",
         resumeMarkdown,

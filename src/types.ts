@@ -28,11 +28,35 @@ export interface MatchCandidate {
 
 export type JobStatus =
   | "discovered"
+  | "fetching"
   | "fetched"
+  | "scoring"
   | "scored"
   | "matched"
   | "rejected"
   | "error";
+
+export type PipelineStage =
+  | "discovering"
+  | "fetching"
+  | "scoring"
+  | "mixed"
+  | "done";
+
+export interface PipelineProgressSnapshot {
+  stage: PipelineStage;
+  discovered: number;
+  skipped: number;
+  queuedFetch: number;
+  fetching: number;
+  queuedScore: number;
+  scoring: number;
+  matched: number;
+  rejected: number;
+  failed: number;
+  activeFetchCompanies: string[];
+  activeScoreCompanies: string[];
+}
 
 export interface StoredJob {
   externalId: string;
@@ -73,6 +97,8 @@ export interface RunConfig {
   databasePath: string;
   resumeMarkdownPath: string;
   matchThreshold: number;
+  fetchConcurrency: number;
+  scoreConcurrency: number;
   sources: {
     justjoinit: SourceConfig;
   };

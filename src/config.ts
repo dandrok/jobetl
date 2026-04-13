@@ -2,17 +2,19 @@ import type { RunConfig } from "./types.js";
 
 export const config: RunConfig = {
   databasePath: "./data/jobetl.db",
-  resumeMarkdownPath: "./cv.md",
+  resumeMarkdownPath: "./cv.example.md",
   matchThreshold: 0.78,
+  fetchConcurrency: 2,
+  scoreConcurrency: 2,
   sources: {
     justjoinit: {
       enabled: true,
       baseUrl: "https://justjoin.it",
-      maxListings: 5, // TODO: we put 5 here only for testing
+      maxListings: 200, // TODO: we put 5 here only for testing
       filters: {
-        keyword: "node.js",
+        keyword: "javascript",
         categorySlug: "javascript",
-        workingMode: "remote",
+        location: 'warszawa',
         withSalaryOnly: false
       }
     }
