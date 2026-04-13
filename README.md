@@ -1,8 +1,8 @@
 # JobETL
 
-`jobetl` is a local-first job scraping and matching tool.
+`jobetl` is a AI-powered job scraping and matching tool.
 
-It collects job offers from selected websites, turns full offers into markdown, compares them against your CV, and stores the results in a local SQLite database so you can review matched jobs in one place.
+It collects job offers from selected websites, turns full offers into markdown, uses LLM-based matching to compare them against your CV, and stores the results in a local SQLite database so you can review matched jobs in one place.
 
 The current flow is:
 
