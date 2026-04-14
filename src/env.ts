@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-import type { RuntimeEnv } from "./types.js";
+import type { NotionSyncEnv, RuntimeEnv } from "./types.js";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -15,5 +15,12 @@ export function loadRuntimeEnv(): RuntimeEnv {
   return {
     jinaApiKey: requireEnv("JINA_API_KEY"),
     deepseekApiKey: requireEnv("DEEPSEEK_API_KEY")
+  };
+}
+
+export function loadNotionSyncEnv(): NotionSyncEnv {
+  return {
+    notionToken: requireEnv("NOTION_TOKEN"),
+    notionDatabaseId: requireEnv("NOTION_DATABASE_ID")
   };
 }

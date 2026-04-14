@@ -3,6 +3,25 @@ import * as cheerio from "cheerio";
 import type { JobListing, SearchFilters } from "../types.js";
 
 const JUSTJOINIT_ROOT = "https://justjoin.it";
+const LEAD_BADGES = new Set(["Super offer", "1-click Apply", "New"]);
+const META_TEXTS = new Set([
+  "Remote",
+  "Hybrid",
+  "Office",
+  "B2B",
+  "Permanent",
+  "Internship",
+  "Mandate contract",
+  "Specific-task contract",
+  "Full-time",
+  "Part-time",
+  "Practice / Internship",
+  "Freelance",
+  "Junior",
+  "Mid",
+  "Senior",
+  "Manager / C-level"
+]);
 
 function cleanText(value?: string): string | undefined {
   const normalized = value?.replace(/\s+/g, " ").trim();
@@ -15,6 +34,43 @@ function normalizeUrl(href: string): string {
   }
 
   return new URL(href, JUSTJOINIT_ROOT).toString();
+}
+
+function isSalaryText(value: string): boolean {
+  return /\b(PLN|USD|EUR|CHF)\b/i.test(value) || /Undisclosed Salary/i.test(value);
+}
+
+function isTimeText(value: string): boolean {
+  return /^\d+\s*d left$/i.test(value) || /^Expires tomorrow$/i.test(value);
+}
+
+function isIgnorableText(value: string): boolean {
+  return LEAD_BADGES.has(value) || META_TEXTS.has(value) || isTimeText(value);
+}
+
+function extractLeafTexts(
+  $: cheerio.CheerioAPI,
+  element: unknown
+): string[] {
+  const texts = $(element as any)
+    .find("*")
+    .map((__, child) => {
+      const tagName = child.tagName?.toLowerCase();
+      if (!tagName || ["script", "style", "svg", "path"].includes(tagName)) {
+        return undefined;
+      }
+
+      const $child = $(child);
+      if ($child.children().length > 0) {
+        return undefined;
+      }
+
+      return cleanText($child.text());
+    })
+    .get()
+    .filter((value): value is string => Boolean(value));
+
+  return texts.filter((value, index) => index === 0 || value !== texts[index - 1]);
 }
 
 export class JustJoinItAdapter {
@@ -63,25 +119,32 @@ export class JustJoinItAdapter {
 
       const url = normalizeUrl(href);
       const externalId = `${this.source}:${new URL(url).pathname}`;
-      const textNodes = $(element)
-        .find("span, h2, h3, div, p")
-        .map((__, child) => cleanText($(child).text()))
-        .get()
-        .filter((value): value is string => Boolean(value));
+      const textNodes = extractLeafTexts($, element);
+      const titleIndex = textNodes.findIndex(
+        (value) => !isIgnorableText(value) && !isSalaryText(value)
+      );
+      const title = titleIndex >= 0 ? textNodes[titleIndex] : undefined;
 
-      const title = textNodes[0];
-      const company = textNodes[1];
-      const salaryText = textNodes.find(
-        (value) =>
-          /\b(PLN|USD|EUR)\b/i.test(value) || /Undisclosed Salary/i.test(value)
-      );
-      const location = textNodes.find(
-        (value) =>
-          value !== title &&
-          value !== company &&
-          value !== salaryText &&
-          !/\b(PLN|USD|EUR)\b/i.test(value)
-      );
+      let salaryText: string | undefined;
+      let company: string | undefined;
+      let location: string | undefined;
+
+      for (const value of textNodes.slice(titleIndex + 1)) {
+        if (!salaryText && isSalaryText(value)) {
+          salaryText = /Undisclosed Salary/i.test(value) ? undefined : value;
+          continue;
+        }
+
+        if (!company && !isIgnorableText(value) && !isSalaryText(value)) {
+          company = value;
+          continue;
+        }
+
+        if (company && !location && !isIgnorableText(value) && !isSalaryText(value)) {
+          location = value;
+          break;
+        }
+      }
 
       if (!title || !company) {
         return;
@@ -93,10 +156,7 @@ export class JustJoinItAdapter {
         url,
         title,
         company,
-        salaryText:
-          salaryText && !/Undisclosed Salary/i.test(salaryText)
-            ? salaryText
-            : undefined,
+        salaryText,
         location
       });
     });

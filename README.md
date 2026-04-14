@@ -52,16 +52,23 @@ npm install
 
 Copy `.env.example` values into your own environment source.
 
-Required variables:
+Required pipeline variables:
 
 - `JINA_API_KEY`
 - `DEEPSEEK_API_KEY`
+
+Required Notion sync variables:
+
+- `NOTION_TOKEN`
+- `NOTION_DATABASE_ID`
 
 For local runs you can export them in your shell:
 
 ```bash
 export JINA_API_KEY=...
 export DEEPSEEK_API_KEY=...
+export NOTION_TOKEN=...
+export NOTION_DATABASE_ID=...
 ```
 
 ### 3. Add your CV markdown
@@ -141,6 +148,36 @@ npm run report
 
 This prints the best locally stored matches from SQLite.
 
+## Syncing to Notion
+
+```bash
+npm run sync:notion
+```
+
+This command:
+
+- reads all jobs from the local SQLite database
+- validates the target Notion database schema
+- creates new Notion pages for unseen `External ID` values
+- updates existing Notion pages when the local `Updated At` value changed
+- leaves already up-to-date pages unchanged
+
+Recommended Notion properties:
+
+- `Name` as title
+- `External ID` as rich text
+- `URL` as url
+- `Status` as status or select
+- `Source` as select or rich text
+- `Company` as rich text
+- `Salary` as rich text
+- `Location` as rich text
+- `Match Score` as number
+- `Match Reason` as rich text
+- `Summary` as rich text
+- `Created At` as date or rich text
+- `Updated At` as date or rich text
+
 ## Verification
 
 ```bash
@@ -153,11 +190,10 @@ npm run build
 - The `justjoin.it` adapter is intentionally narrow and should be hardened against future markup changes.
 - The current pipeline is bounded-concurrency only; it does not auto-scale or prioritize sources.
 - The pipeline does not yet implement retries, backoff, or result caching.
-- Local SQLite is the active store; Notion export is intentionally deferred.
+- GitHub Actions automation is still deferred until the local Notion workflow is stable.
 
 ## Next extensions
 
-- Add a Notion export or sync layer on top of the local database
 - Add more source adapters behind the same interface
 - Expand source-side filter coverage
 - Add retry/backoff for Jina and DeepSeek

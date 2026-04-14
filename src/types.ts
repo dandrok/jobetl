@@ -108,3 +108,8 @@ export interface RuntimeEnv {
   jinaApiKey: string;
   deepseekApiKey: string;
 }
+
+export interface NotionSyncEnv {
+  notionToken: string;
+  notionDatabaseId: string;
+}
