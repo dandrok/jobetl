@@ -26,6 +26,14 @@ export const config: RunConfig = {
         keyword: "javascript",
         location: "warszawa"
       }
+    },
+    bulldogjob: {
+      enabled: true,
+      baseUrl: "https://bulldogjob.com",
+      maxListings: 200,
+      filters: {
+        keyword: "JavaScript"
+      }
     }
   }
 };

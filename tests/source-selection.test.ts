@@ -30,6 +30,14 @@ function createConfig(): RunConfig {
           keyword: "javascript",
           location: "warszawa"
         }
+      },
+      bulldogjob: {
+        enabled: true,
+        baseUrl: "https://bulldogjob.com",
+        maxListings: 10,
+        filters: {
+          keyword: "JavaScript"
+        }
       }
     }
   };
@@ -44,6 +52,10 @@ function createAdapters(): SourceAdapterMap {
     nofluffjobs: {
       source: "nofluffjobs",
       discoverListings: async () => []
+    },
+    bulldogjob: {
+      source: "bulldogjob",
+      discoverListings: async () => []
     }
   };
 }
@@ -54,7 +66,8 @@ describe("selectSources", () => {
 
     expect(selected.map((item) => item.source)).toEqual([
       "justjoinit",
-      "nofluffjobs"
+      "nofluffjobs",
+      "bulldogjob"
     ]);
   });
 

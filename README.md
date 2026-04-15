@@ -16,7 +16,7 @@ The current flow is:
 ## MVP scope
 
 - Runtime: Node.js + TypeScript
-- Sources: `justjoin.it`, `nofluffjobs`
+- Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`
 - Offer extraction: Jina Reader
 - Matching: AI SDK + DeepSeek
 - Storage: local SQLite database
@@ -137,6 +137,7 @@ Run a single source:
 ```bash
 npm run dev -- --source justjoinit
 npm run dev -- --source nofluffjobs
+npm run dev -- --source bulldogjob
 ```
 
 Expected result:

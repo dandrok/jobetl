@@ -69,17 +69,32 @@ function createConfig(): RunConfig {
           location: "warszawa"
         },
         maxListings: 10
+      },
+      bulldogjob: {
+        enabled: true,
+        baseUrl: "https://bulldogjob.com",
+        filters: {
+          keyword: "JavaScript"
+        },
+        maxListings: 10
       }
     }
   };
 }
 
 function createListing(id: string, source: JobSource = "justjoinit"): JobListing {
-  const path = source === "justjoinit" ? `/job-offer/${id}` : `/pl/job/${id}`;
+  const path =
+    source === "justjoinit"
+      ? `/job-offer/${id}`
+      : source === "nofluffjobs"
+        ? `/pl/job/${id}`
+        : `/companies/jobs/${id}`;
   const url =
     source === "justjoinit"
       ? `https://justjoin.it${path}`
-      : `https://nofluffjobs.com${path}`;
+      : source === "nofluffjobs"
+        ? `https://nofluffjobs.com${path}`
+        : `https://bulldogjob.com${path}`;
 
   return {
     externalId: `${source}:${path}`,
@@ -216,6 +231,10 @@ function createAdapters(
     nofluffjobs: {
       source: "nofluffjobs",
       discoverListings: vi.fn(async () => listingsBySource.nofluffjobs ?? [])
+    },
+    bulldogjob: {
+      source: "bulldogjob",
+      discoverListings: vi.fn(async () => listingsBySource.bulldogjob ?? [])
     }
   };
 }
@@ -328,6 +347,29 @@ describe("runPipeline", () => {
     expect(summary.scanned).toBe(1);
     expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
     expect(adapters.nofluffjobs.discoverListings).toHaveBeenCalledTimes(1);
+  });
+
+  test("runs only bulldogjob discovery when the bulldogjob source filter is selected", async () => {
+    const config = createConfig();
+    const repository = createRepository();
+    const adapters = createAdapters({
+      bulldogjob: [createListing("bdj-1", "bulldogjob")],
+      justjoinit: [createListing("jji-1", "justjoinit")],
+      nofluffjobs: [createListing("nfj-1", "nofluffjobs")]
+    });
+    const dependencies = createDependencies(repository, adapters);
+
+    const summary = await runPipeline(
+      config,
+      undefined,
+      dependencies,
+      { source: "bulldogjob" }
+    );
+
+    expect(summary.scanned).toBe(1);
+    expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
+    expect(adapters.nofluffjobs.discoverListings).not.toHaveBeenCalled();
+    expect(adapters.bulldogjob.discoverListings).toHaveBeenCalledTimes(1);
   });
 
   test("skips jobs already finalized as matched or rejected after upserting them", async () => {

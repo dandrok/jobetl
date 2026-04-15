@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test, vi } from "vitest";
 
+import { BulldogjobAdapter } from "../src/sources/bulldogjob.js";
 import { JustJoinItAdapter } from "../src/sources/justjoinit.js";
 import { NoFluffJobsAdapter } from "../src/sources/nofluffjobs.js";
 
@@ -168,6 +169,64 @@ describe("NoFluffJobsAdapter", () => {
         "nofluffjobs:/pl/job/full-stack-software-engineer-node-js-react-js-aws-bayer-warsaw",
       company: "Bayer",
       location: "Warsaw"
+    });
+  });
+});
+
+describe("BulldogjobAdapter", () => {
+  test("discovers listings across classic paginated pages", async () => {
+    const page1 = readFileSync(
+      "tests/fixtures/bulldogjob-listing-page1.html",
+      "utf8"
+    );
+    const page2 = readFileSync(
+      "tests/fixtures/bulldogjob-listing-page2.html",
+      "utf8"
+    );
+    const adapter = new BulldogjobAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url === "https://bulldogjob.com/companies/jobs/s/skills,JavaScript") {
+        return page1;
+      }
+
+      if (url === "https://bulldogjob.com/companies/jobs/s/skills,JavaScript/page,2") {
+        return page2;
+      }
+
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://bulldogjob.com",
+        maxListings: 3,
+        filters: {
+          keyword: "JavaScript"
+        }
+      },
+      fetchHtml
+    );
+
+    expect(fetchHtml.mock.calls.map(([url]) => url)).toEqual([
+      "https://bulldogjob.com/companies/jobs/s/skills,JavaScript",
+      "https://bulldogjob.com/companies/jobs/s/skills,JavaScript/page,2"
+    ]);
+    expect(offers).toHaveLength(3);
+    expect(offers[0]).toMatchObject({
+      externalId:
+        "bulldogjob:/companies/jobs/206810-wealth-platforms-junior-programmer-warsaw-accenture-polska",
+      source: "bulldogjob",
+      url: "https://bulldogjob.com/companies/jobs/206810-wealth-platforms-junior-programmer-warsaw-accenture-polska",
+      title: "Wealth Platforms Junior Programmer",
+      company: "Accenture Polska",
+      location: "Warsaw"
+    });
+    expect(offers[2]).toMatchObject({
+      externalId:
+        "bulldogjob:/companies/jobs/236466-senior-frontend-engineer-madrid-aircall",
+      company: "Aircall",
+      location: "Madrid"
     });
   });
 });
