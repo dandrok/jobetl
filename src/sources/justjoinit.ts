@@ -1,6 +1,11 @@
 import * as cheerio from "cheerio";
 
-import type { JobListing, SearchFilters } from "../types.js";
+import type {
+  JobListing,
+  JustJoinItSearchFilters,
+  SourceConfig
+} from "../types.js";
+import type { SourceAdapter } from "./types.js";
 
 const JUSTJOINIT_ROOT = "https://justjoin.it";
 const LEAD_BADGES = new Set(["Super offer", "1-click Apply", "New"]);
@@ -28,12 +33,12 @@ function cleanText(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-function normalizeUrl(href: string): string {
+function normalizeUrl(href: string, baseUrl = JUSTJOINIT_ROOT): string {
   if (href.startsWith("http://") || href.startsWith("https://")) {
     return href;
   }
 
-  return new URL(href, JUSTJOINIT_ROOT).toString();
+  return new URL(href, baseUrl).toString();
 }
 
 function isSalaryText(value: string): boolean {
@@ -73,11 +78,14 @@ function extractLeafTexts(
   return texts.filter((value, index) => index === 0 || value !== texts[index - 1]);
 }
 
-export class JustJoinItAdapter {
+export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
   readonly source = "justjoinit" as const;
 
-  buildSearchUrl(filters: SearchFilters): string {
-    const url = new URL("/job-offers/all-locations", JUSTJOINIT_ROOT);
+  buildSearchUrl(
+    filters: JustJoinItSearchFilters,
+    baseUrl = JUSTJOINIT_ROOT
+  ): string {
+    const url = new URL("/job-offers/all-locations", baseUrl);
 
     if (filters.keyword) {
       url.searchParams.set("keyword", filters.keyword);
@@ -107,7 +115,18 @@ export class JustJoinItAdapter {
     return url.toString();
   }
 
-  parseListings(html: string): JobListing[] {
+  async discoverListings(
+    config: SourceConfig<JustJoinItSearchFilters>,
+    fetchHtml: (url: string) => Promise<string>
+  ): Promise<JobListing[]> {
+    const html = await fetchHtml(
+      this.buildSearchUrl(config.filters, config.baseUrl)
+    );
+
+    return this.parseListings(html, config.baseUrl).slice(0, config.maxListings);
+  }
+
+  parseListings(html: string, baseUrl = JUSTJOINIT_ROOT): JobListing[] {
     const $ = cheerio.load(html);
     const offers = new Map<string, JobListing>();
 
@@ -117,7 +136,7 @@ export class JustJoinItAdapter {
         return;
       }
 
-      const url = normalizeUrl(href);
+      const url = normalizeUrl(href, baseUrl);
       const externalId = `${this.source}:${new URL(url).pathname}`;
       const textNodes = extractLeafTexts($, element);
       const titleIndex = textNodes.findIndex(

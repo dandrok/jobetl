@@ -10,12 +10,21 @@ export const config: RunConfig = {
     justjoinit: {
       enabled: true,
       baseUrl: "https://justjoin.it",
-      maxListings: 200, // TODO: we put 5 here only for testing
+      maxListings: 200,
       filters: {
         keyword: "javascript",
         categorySlug: "javascript",
-        location: 'warszawa',
+        location: "warszawa",
         withSalaryOnly: false
+      }
+    },
+    nofluffjobs: {
+      enabled: true,
+      baseUrl: "https://nofluffjobs.com",
+      maxListings: 200,
+      filters: {
+        keyword: "javascript",
+        location: "warszawa"
       }
     }
   }

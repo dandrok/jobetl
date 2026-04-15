@@ -1,4 +1,6 @@
-export type JobSource = "justjoinit";
+export const JOB_SOURCES = ["justjoinit", "nofluffjobs"] as const;
+
+export type JobSource = (typeof JOB_SOURCES)[number];
 
 export interface JobListing {
   externalId: string;
@@ -75,7 +77,7 @@ export interface StoredJob {
   updatedAt: string;
 }
 
-export interface SearchFilters {
+export interface JustJoinItSearchFilters {
   keyword?: string;
   categorySlug?: string;
   location?: string;
@@ -86,12 +88,26 @@ export interface SearchFilters {
   withSalaryOnly?: boolean;
 }
 
-export interface SourceConfig {
+export interface NoFluffJobsSearchFilters {
+  keyword?: string;
+  location?: string;
+}
+
+export type SearchFilters = JustJoinItSearchFilters;
+
+export interface SourceConfig<TFilters = SearchFilters> {
   enabled: boolean;
   baseUrl: string;
-  filters: SearchFilters;
+  filters: TFilters;
   maxListings: number;
 }
+
+export interface SourceConfigMap {
+  justjoinit: SourceConfig<JustJoinItSearchFilters>;
+  nofluffjobs: SourceConfig<NoFluffJobsSearchFilters>;
+}
+
+export type SourceConfigFor<T extends JobSource> = SourceConfigMap[T];
 
 export interface RunConfig {
   databasePath: string;
@@ -99,9 +115,7 @@ export interface RunConfig {
   matchThreshold: number;
   fetchConcurrency: number;
   scoreConcurrency: number;
-  sources: {
-    justjoinit: SourceConfig;
-  };
+  sources: SourceConfigMap;
 }
 
 export interface RuntimeEnv {

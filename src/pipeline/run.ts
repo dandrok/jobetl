@@ -4,12 +4,15 @@ import { loadRuntimeEnv } from "../env.js";
 import { JinaReaderClient } from "../jina/client.js";
 import { DeepSeekMatcher } from "../matching/deepseek-matcher.js";
 import type { ProgressReporter } from "../progress/ora-progress-reporter.js";
-import { JustJoinItAdapter } from "../sources/justjoinit.js";
+import { createSourceAdapters } from "../sources/index.js";
+import { selectSources } from "../sources/select.js";
+import type { SelectedSource, SourceAdapterMap } from "../sources/types.js";
 import { SQLiteJobRepository } from "../storage/sqlite-job-repository.js";
 import { AsyncQueue } from "./async-queue.js";
 import type {
   JobListing,
   JobOffer,
+  JobSource,
   JobStatus,
   MatchCandidate,
   MatchResult,
@@ -38,16 +41,17 @@ export interface PipelineRepository {
 }
 
 export interface PipelineDependencies {
-  buildListingUrl(
-    filters: RunConfig["sources"]["justjoinit"]["filters"]
-  ): string;
+  adapters: SourceAdapterMap;
   fetchListingHtml(url: string): Promise<string>;
-  parseListings(html: string): JobListing[];
   loadResumeMarkdown(path: string): Promise<string>;
   fetchOfferMarkdown(url: string): Promise<string>;
   scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult>;
   countStoredJobs(): number;
   repository: PipelineRepository;
+}
+
+export interface RunPipelineOptions {
+  source?: JobSource;
 }
 
 function createProgressSnapshot(): PipelineProgressSnapshot {
@@ -76,11 +80,29 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
+async function discoverSource(
+  selectedSource: SelectedSource,
+  fetchHtml: (url: string) => Promise<string>
+): Promise<JobListing[]> {
+  return selectedSource.adapter.discoverListings(selectedSource.config, fetchHtml);
+}
+
+function dedupeListings(listings: JobListing[]): JobListing[] {
+  const uniqueListings = new Map<string, JobListing>();
+
+  for (const listing of listings) {
+    if (!uniqueListings.has(listing.externalId)) {
+      uniqueListings.set(listing.externalId, listing);
+    }
+  }
+
+  return [...uniqueListings.values()];
+}
+
 function createPipelineDependencies(
   config: RunConfig,
   overrides: Partial<PipelineDependencies> = {}
 ): PipelineDependencies {
-  const adapter = new JustJoinItAdapter();
   const defaultRepository = new SQLiteJobRepository(config.databasePath);
   const defaultCountStoredJobs = (): number => defaultRepository.listJobs().length;
   const missingCountStoredJobs = (): number => {
@@ -103,9 +125,8 @@ function createPipelineDependencies(
   }
 
   return {
-    buildListingUrl: overrides.buildListingUrl ?? adapter.buildSearchUrl.bind(adapter),
+    adapters: overrides.adapters ?? createSourceAdapters(),
     fetchListingHtml: overrides.fetchListingHtml ?? fetchText,
-    parseListings: overrides.parseListings ?? adapter.parseListings.bind(adapter),
     loadResumeMarkdown:
       overrides.loadResumeMarkdown ??
       ((path: string) => readFile(path, "utf8")),
@@ -126,7 +147,8 @@ function createPipelineDependencies(
 export async function runPipeline(
   config: RunConfig,
   progress?: ProgressReporter,
-  dependencyOverrides: Partial<PipelineDependencies> = {}
+  dependencyOverrides: Partial<PipelineDependencies> = {},
+  options: RunPipelineOptions = {}
 ): Promise<RunSummary> {
   const dependencies = createPipelineDependencies(config, dependencyOverrides);
   const snapshot = createProgressSnapshot();
@@ -145,11 +167,17 @@ export async function runPipeline(
 
     progress[method](progressSnapshot);
   };
-  const listingUrl = dependencies.buildListingUrl(config.sources.justjoinit.filters);
-  const listingHtml = await dependencies.fetchListingHtml(listingUrl);
-  const listings = dependencies
-    .parseListings(listingHtml)
-    .slice(0, config.sources.justjoinit.maxListings);
+  const selectedSources = selectSources(
+    config,
+    dependencies.adapters,
+    options.source
+  );
+  const discoveredListings = await Promise.all(
+    selectedSources.map((selectedSource) =>
+      discoverSource(selectedSource, dependencies.fetchListingHtml)
+    )
+  );
+  const listings = dedupeListings(discoveredListings.flat());
   snapshot.discovered = listings.length;
   emitSnapshot("start");
   let resumeMarkdownPromise: Promise<string> | undefined;

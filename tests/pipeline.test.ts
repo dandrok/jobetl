@@ -9,9 +9,11 @@ import {
   type PipelineDependencies,
   type PipelineRepository
 } from "../src/pipeline/run.js";
+import type { SourceAdapterMap } from "../src/sources/types.js";
 import type {
   JobListing,
   JobOffer,
+  JobSource,
   JobStatus,
   MatchResult,
   PipelineProgressSnapshot,
@@ -58,16 +60,31 @@ function createConfig(): RunConfig {
           keyword: "node"
         },
         maxListings: 10
+      },
+      nofluffjobs: {
+        enabled: true,
+        baseUrl: "https://nofluffjobs.com",
+        filters: {
+          keyword: "javascript",
+          location: "warszawa"
+        },
+        maxListings: 10
       }
     }
   };
 }
 
-function createListing(id: string): JobListing {
+function createListing(id: string, source: JobSource = "justjoinit"): JobListing {
+  const path = source === "justjoinit" ? `/job-offer/${id}` : `/pl/job/${id}`;
+  const url =
+    source === "justjoinit"
+      ? `https://justjoin.it${path}`
+      : `https://nofluffjobs.com${path}`;
+
   return {
-    externalId: `justjoinit:/job-offer/${id}`,
-    source: "justjoinit",
-    url: `https://justjoin.it/job-offer/${id}`,
+    externalId: `${source}:${path}`,
+    source,
+    url,
     title: `Role ${id}`,
     company: `Company ${id}`,
     location: "Remote"
@@ -188,20 +205,37 @@ function createStoredJob(listing: JobListing, status: JobStatus): StoredJob {
   };
 }
 
+function createAdapters(
+  listingsBySource: Partial<Record<JobSource, JobListing[]>> = {}
+): SourceAdapterMap {
+  return {
+    justjoinit: {
+      source: "justjoinit",
+      discoverListings: vi.fn(async () => listingsBySource.justjoinit ?? [])
+    },
+    nofluffjobs: {
+      source: "nofluffjobs",
+      discoverListings: vi.fn(async () => listingsBySource.nofluffjobs ?? [])
+    }
+  };
+}
+
 function createDependencies(
   repository: PipelineRepository & { jobs: Map<string, StoredJob> },
-  listings: JobListing[],
+  listingsOrAdapters: JobListing[] | SourceAdapterMap,
   overrides: Partial<PipelineDependencies> = {}
 ): PipelineDependencies {
   const loadResumeMarkdown =
     overrides.loadResumeMarkdown ?? vi.fn(async () => "# Resume\n\nNode.js and ETL");
   const countStoredJobs =
     overrides.countStoredJobs ?? vi.fn(() => repository.jobs.size);
+  const adapters = Array.isArray(listingsOrAdapters)
+    ? createAdapters({ justjoinit: listingsOrAdapters })
+    : listingsOrAdapters;
 
   return {
-    buildListingUrl: overrides.buildListingUrl ?? vi.fn(() => "https://example.com/jobs"),
+    adapters: overrides.adapters ?? adapters,
     fetchListingHtml: overrides.fetchListingHtml ?? vi.fn(async () => "<html />"),
-    parseListings: overrides.parseListings ?? vi.fn(() => listings),
     loadResumeMarkdown,
     fetchOfferMarkdown:
       overrides.fetchOfferMarkdown ??
@@ -215,6 +249,87 @@ function createDependencies(
 }
 
 describe("runPipeline", () => {
+  test("dedupes repeated listings discovered in the same run before fetch and score", async () => {
+    const config = createConfig();
+    const repository = createRepository();
+    const repeatedListing = createListing("nfj-dup", "nofluffjobs");
+    const uniqueListing = createListing("nfj-unique", "nofluffjobs");
+    const adapters = createAdapters({
+      nofluffjobs: [repeatedListing, repeatedListing, uniqueListing]
+    });
+    const fetchOfferMarkdown = vi.fn(async () => "# Offer");
+    const scoreOffer = vi.fn(async () => createMatchResult(0.9));
+    const dependencies = createDependencies(repository, adapters, {
+      fetchOfferMarkdown,
+      scoreOffer
+    });
+
+    const summary = await runPipeline(config, undefined, dependencies, {
+      source: "nofluffjobs"
+    });
+
+    expect(summary).toMatchObject({
+      scanned: 2,
+      fetched: 2,
+      matched: 2
+    });
+    expect(fetchOfferMarkdown).toHaveBeenCalledTimes(2);
+    expect(scoreOffer).toHaveBeenCalledTimes(2);
+    expect(
+      repository.operations.filter(
+        (operation) => operation === `upsert:${repeatedListing.externalId}`
+      )
+    ).toHaveLength(1);
+  });
+
+  test("discovers listings from all enabled sources before entering shared fetch and score queues", async () => {
+    const config = createConfig();
+    const repository = createRepository();
+    const adapters = createAdapters({
+      justjoinit: [createListing("jji-1", "justjoinit")],
+      nofluffjobs: [createListing("nfj-1", "nofluffjobs")]
+    });
+    const fetchOfferMarkdown = vi.fn(async () => "# Offer");
+    const scoreOffer = vi.fn(async () => createMatchResult(0.9));
+    const dependencies = createDependencies(repository, adapters, {
+      fetchOfferMarkdown,
+      scoreOffer
+    });
+
+    const summary = await runPipeline(config, undefined, dependencies);
+
+    expect(summary).toMatchObject({
+      scanned: 2,
+      fetched: 2,
+      matched: 2
+    });
+    expect(adapters.justjoinit.discoverListings).toHaveBeenCalledTimes(1);
+    expect(adapters.nofluffjobs.discoverListings).toHaveBeenCalledTimes(1);
+    expect(fetchOfferMarkdown).toHaveBeenCalledTimes(2);
+    expect(scoreOffer).toHaveBeenCalledTimes(2);
+  });
+
+  test("uses the optional source filter to skip discovery for other sources", async () => {
+    const config = createConfig();
+    const repository = createRepository();
+    const adapters = createAdapters({
+      justjoinit: [createListing("jji-1", "justjoinit")],
+      nofluffjobs: [createListing("nfj-1", "nofluffjobs")]
+    });
+    const dependencies = createDependencies(repository, adapters);
+
+    const summary = await runPipeline(
+      config,
+      undefined,
+      dependencies,
+      { source: "nofluffjobs" }
+    );
+
+    expect(summary.scanned).toBe(1);
+    expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
+    expect(adapters.nofluffjobs.discoverListings).toHaveBeenCalledTimes(1);
+  });
+
   test("skips jobs already finalized as matched or rejected after upserting them", async () => {
     const config = createConfig();
     const matchedListing = createListing("matched");

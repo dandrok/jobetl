@@ -1,9 +1,35 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { JustJoinItAdapter } from "../src/sources/justjoinit.js";
+import { NoFluffJobsAdapter } from "../src/sources/nofluffjobs.js";
 
 describe("JustJoinItAdapter", () => {
+  test("limits discovery to the configured maxListings", async () => {
+    const html = readFileSync("tests/fixtures/justjoinit-listing.html", "utf8");
+    const adapter = new JustJoinItAdapter();
+    const fetchHtml = vi.fn(async () => html);
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://justjoin.it",
+        maxListings: 1,
+        filters: {
+          keyword: "javascript",
+          categorySlug: "javascript",
+          location: "warszawa"
+        }
+      },
+      fetchHtml
+    );
+
+    expect(fetchHtml).toHaveBeenCalledWith(
+      "https://justjoin.it/job-offers/all-locations?keyword=javascript&category=javascript&location=warszawa"
+    );
+    expect(offers).toHaveLength(1);
+  });
+
   test("extracts offer urls and listing metadata from html", () => {
     const html = readFileSync("tests/fixtures/justjoinit-listing.html", "utf8");
     const adapter = new JustJoinItAdapter();
@@ -82,6 +108,66 @@ describe("JustJoinItAdapter", () => {
       company: "Antal Sp. z o.o.",
       salaryText: "23 500 - 26 800 PLN/month",
       location: "Wrocław"
+    });
+  });
+});
+
+describe("NoFluffJobsAdapter", () => {
+  test("discovers listings across paginated pages", async () => {
+    const page1 = readFileSync(
+      "tests/fixtures/nofluffjobs-listing-page1.html",
+      "utf8"
+    );
+    const page2 = readFileSync(
+      "tests/fixtures/nofluffjobs-listing-page2.html",
+      "utf8"
+    );
+    const adapter = new NoFluffJobsAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url === "https://nofluffjobs.com/pl/warszawa/javascript") {
+        return page1;
+      }
+
+      if (url === "https://nofluffjobs.com/pl/warszawa/javascript?page=2") {
+        return page2;
+      }
+
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://nofluffjobs.com",
+        maxListings: 3,
+        filters: {
+          keyword: "javascript",
+          location: "warszawa"
+        }
+      },
+      fetchHtml
+    );
+
+    expect(fetchHtml.mock.calls.map(([url]) => url)).toEqual([
+      "https://nofluffjobs.com/pl/warszawa/javascript",
+      "https://nofluffjobs.com/pl/warszawa/javascript?page=2"
+    ]);
+    expect(offers).toHaveLength(3);
+    expect(offers[0]).toMatchObject({
+      externalId:
+        "nofluffjobs:/pl/job/projektant-projektantka-aplikacji-javascript-pko-finat-warszawa",
+      source: "nofluffjobs",
+      url: "https://nofluffjobs.com/pl/job/projektant-projektantka-aplikacji-javascript-pko-finat-warszawa",
+      title: "Projektant / Projektantka Aplikacji (JavaScript)",
+      company: "PKO Finat Sp. z o.o.",
+      salaryText: "20 160 - 24 360 PLN",
+      location: "Warszawa"
+    });
+    expect(offers[2]).toMatchObject({
+      externalId:
+        "nofluffjobs:/pl/job/full-stack-software-engineer-node-js-react-js-aws-bayer-warsaw",
+      company: "Bayer",
+      location: "Warsaw"
     });
   });
 });

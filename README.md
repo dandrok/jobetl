@@ -6,18 +6,17 @@ It collects job offers from selected websites, turns full offers into markdown, 
 
 The current flow is:
 
-1. Search `justjoin.it` with source-side filters.
-2. Discover offer links and basic listing metadata first.
-3. Save discovered listings into a local SQLite database.
-4. Skip jobs already finalized as `matched` or `rejected` on later runs.
-5. Fetch offer pages through Jina Reader with bounded concurrency.
-6. Score fetched offers against your CV with bounded concurrency while fetching continues.
-7. Update the same SQLite rows as `matched`, `rejected`, or `error`.
+1. Discover listings from all enabled sources with source-side filters.
+2. Save discovered listings into a local SQLite database.
+3. Skip jobs already finalized as `matched` or `rejected` on later runs.
+4. Fetch offer pages through Jina Reader with bounded concurrency.
+5. Score fetched offers against your CV with bounded concurrency while fetching continues.
+6. Update the same SQLite rows as `matched`, `rejected`, or `error`.
 
 ## MVP scope
 
 - Runtime: Node.js + TypeScript
-- Source: `justjoin.it`
+- Sources: `justjoin.it`, `nofluffjobs`
 - Offer extraction: Jina Reader
 - Matching: AI SDK + DeepSeek
 - Storage: local SQLite database
@@ -127,8 +126,17 @@ Status values currently used:
 
 ## Running locally
 
+Run all enabled sources:
+
 ```bash
 npm run dev
+```
+
+Run a single source:
+
+```bash
+npm run dev -- --source justjoinit
+npm run dev -- --source nofluffjobs
 ```
 
 Expected result:
@@ -139,6 +147,8 @@ Expected result:
 - fetches and scores offers concurrently with bounded worker counts,
 - updates rows as `matched`, `rejected`, or `error`,
 - prints a JSON summary with run counters `scanned`, `skipped`, `fetched`, `matched`, `rejected`, `failed`, plus `stored` as the cumulative total currently present in the local database after the run.
+
+Source filtering changes only the discovery stage. SQLite, Jina fetch, and DeepSeek scoring remain shared.
 
 ## Reviewing local matches
 
@@ -187,7 +197,7 @@ npm run build
 
 ## Current limitations
 
-- The `justjoin.it` adapter is intentionally narrow and should be hardened against future markup changes.
+- The current adapters are intentionally narrow and should be hardened against future markup changes.
 - The current pipeline is bounded-concurrency only; it does not auto-scale or prioritize sources.
 - The pipeline does not yet implement retries, backoff, or result caching.
 - GitHub Actions automation is still deferred until the local Notion workflow is stable.
