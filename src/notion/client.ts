@@ -10,11 +10,27 @@ import type { ExistingNotionJob, NotionSyncClient } from "./sync.js";
 const NOTION_API_BASE_URL = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
 
+export interface NotionDatabasePage {
+  id: string;
+  createdTime: string;
+  lastEditedTime: string;
+  properties: Record<string, unknown>;
+}
+
+export interface NotionPageBatch {
+  results: NotionDatabasePage[];
+  nextCursor?: string;
+}
+
 interface NotionQueryResponse {
   results: Array<{
     id: string;
+    created_time?: string;
+    last_edited_time?: string;
     properties: Record<string, unknown>;
   }>;
+  has_more?: boolean;
+  next_cursor?: string | null;
 }
 
 function readRichTextPlainText(property: unknown): string | undefined {
@@ -94,6 +110,29 @@ export class NotionDatabaseClient implements NotionSyncClient {
     return {
       pageId: page.id,
       syncedUpdatedAt
+    };
+  }
+
+  async listJobsPage(startCursor?: string): Promise<NotionPageBatch> {
+    const response = await this.request<NotionQueryResponse>(
+      `/databases/${this.env.notionDatabaseId}/query`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          page_size: 100,
+          ...(startCursor ? { start_cursor: startCursor } : {})
+        })
+      }
+    );
+
+    return {
+      results: response.results.map((page) => ({
+        id: page.id,
+        createdTime: page.created_time ?? "",
+        lastEditedTime: page.last_edited_time ?? "",
+        properties: page.properties
+      })),
+      nextCursor: response.has_more ? response.next_cursor ?? undefined : undefined
     };
   }
 

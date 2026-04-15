@@ -19,8 +19,8 @@ The current flow is:
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`
 - Offer extraction: Jina Reader
 - Matching: AI SDK + DeepSeek
-- Storage: local SQLite database
-- Execution: local CLI first
+- Storage: local SQLite database with optional Notion sync
+- Execution: local CLI and daily GitHub Actions workflow
 
 ## Project layout
 
@@ -189,6 +189,38 @@ Recommended Notion properties:
 - `Created At` as date or rich text
 - `Updated At` as date or rich text
 
+## Notion hydration
+
+```bash
+npm run import:notion
+```
+
+This command:
+
+- paginates through the configured Notion database
+- rebuilds local SQLite rows by `External ID`
+- preserves stored statuses and match metadata when present
+- skips malformed rows without aborting the entire import
+
+This is mainly useful for GitHub Actions, where the runner starts from an empty local filesystem and needs to rebuild SQLite state before crawling.
+
+## GitHub Actions automation
+
+The repository includes [daily-crawl.yml](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml), which runs once per day and also supports manual `workflow_dispatch`.
+
+Required GitHub repository secrets:
+
+- `JINA_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `NOTION_TOKEN`
+- `NOTION_DATABASE_ID`
+
+Workflow order:
+
+1. `npm run import:notion`
+2. `npm run dev`
+3. `npm run sync:notion`
+
 ## Verification
 
 ```bash
@@ -201,11 +233,9 @@ npm run build
 - The current adapters are intentionally narrow and should be hardened against future markup changes.
 - The current pipeline is bounded-concurrency only; it does not auto-scale or prioritize sources.
 - The pipeline does not yet implement retries, backoff, or result caching.
-- GitHub Actions automation is still deferred until the local Notion workflow is stable.
 
 ## Next extensions
 
 - Add more source adapters behind the same interface
 - Expand source-side filter coverage
 - Add retry/backoff for Jina and DeepSeek
-- Add GitHub Actions once the local workflow is stable

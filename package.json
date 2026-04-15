@@ -10,6 +10,7 @@
     "build": "tsc --project tsconfig.json",
     "dev": "tsx src/cli.ts",
     "report": "tsx src/report.ts",
+    "import:notion": "tsx src/import-notion.ts",
     "sync:notion": "tsx src/sync-notion.ts",
     "test": "vitest run",
     "test:watch": "vitest"

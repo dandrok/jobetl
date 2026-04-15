@@ -80,4 +80,57 @@ describe("NotionDatabaseClient", () => {
       syncedUpdatedAt: "2024-01-02T00:00:00.000Z"
     });
   });
+
+  test("lists database pages with pagination metadata for hydration", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        results: [
+          {
+            id: "page-1",
+            created_time: "2024-01-01T00:00:00.000Z",
+            last_edited_time: "2024-01-03T00:00:00.000Z",
+            properties: {
+              Name: {
+                type: "title",
+                title: [{ plain_text: "Senior Node Engineer" }]
+              },
+              "External ID": {
+                type: "rich_text",
+                rich_text: [{ plain_text: "justjoinit:/job-offer/acme" }]
+              },
+              URL: {
+                type: "url",
+                url: "https://justjoin.it/job-offer/acme"
+              },
+              Status: {
+                type: "status",
+                status: { name: "matched" }
+              }
+            }
+          }
+        ],
+        has_more: true,
+        next_cursor: "cursor-2"
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new NotionDatabaseClient({
+      notionToken: "secret_test",
+      notionDatabaseId: "database-id"
+    });
+
+    await expect(client.listJobsPage()).resolves.toEqual({
+      results: [
+        {
+          id: "page-1",
+          createdTime: "2024-01-01T00:00:00.000Z",
+          lastEditedTime: "2024-01-03T00:00:00.000Z",
+          properties: expect.any(Object)
+        }
+      ],
+      nextCursor: "cursor-2"
+    });
+  });
 });

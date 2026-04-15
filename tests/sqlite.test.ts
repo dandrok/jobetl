@@ -197,4 +197,35 @@ describe("SQLiteJobRepository", () => {
       summary: "Backend data platform role with strong Node.js fit."
     });
   });
+
+  test("upserts fully hydrated jobs and preserves imported timestamps", () => {
+    const repository = createRepository();
+
+    repository.upsertStoredJob({
+      externalId: "justjoinit:/job-offer/acme",
+      source: "justjoinit",
+      url: "https://justjoin.it/job-offer/acme",
+      title: "Senior Node Engineer",
+      company: "",
+      salaryText: "20 000 - 28 000 PLN/month",
+      location: "Remote",
+      offerMarkdown: undefined,
+      matchScore: 0.91,
+      matchReason: "Strong overlap in Node.js",
+      summary: "Backend role with good fit",
+      status: "matched",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-03T00:00:00.000Z"
+    });
+
+    expect(repository.listJobs()).toEqual([
+      expect.objectContaining({
+        externalId: "justjoinit:/job-offer/acme",
+        status: "matched",
+        matchScore: 0.91,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-03T00:00:00.000Z"
+      })
+    ]);
+  });
 });

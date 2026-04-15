@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { buildNotionJobProperties } from "../src/notion/mapper.js";
+import {
+  buildNotionJobProperties,
+  mapNotionPageToStoredJob
+} from "../src/notion/mapper.js";
 import type { StoredJob } from "../src/types.js";
 
 const job: StoredJob = {
@@ -102,6 +105,59 @@ describe("buildNotionJobProperties", () => {
         rich_text: [{ text: { content: "2024-01-01T00:00:00.000Z" } }]
       },
       "Updated At": { date: { start: "2024-01-02T00:00:00.000Z" } }
+    });
+  });
+
+  test("maps a Notion page back into a StoredJob using safe fallbacks", () => {
+    expect(
+      mapNotionPageToStoredJob(
+        {
+          id: "page-1",
+          createdTime: "2024-01-01T00:00:00.000Z",
+          lastEditedTime: "2024-01-03T00:00:00.000Z",
+          properties: {
+            Name: {
+              type: "title",
+              title: [{ plain_text: "Senior Node Engineer" }]
+            },
+            "External ID": {
+              type: "rich_text",
+              rich_text: [{ plain_text: "justjoinit:/job-offer/acme" }]
+            },
+            URL: {
+              type: "url",
+              url: "https://justjoin.it/job-offer/acme"
+            },
+            Status: {
+              type: "status",
+              status: { name: "matched" }
+            },
+            Salary: {
+              type: "rich_text",
+              rich_text: [{ plain_text: "20 000 - 28 000 PLN/month" }]
+            }
+          }
+        },
+        {
+          statusKind: "status",
+          salaryKind: "rich_text"
+        }
+      )
+    ).toEqual({
+      externalId: "justjoinit:/job-offer/acme",
+      source: "justjoinit",
+      url: "https://justjoin.it/job-offer/acme",
+      title: "Senior Node Engineer",
+      company: "",
+      salaryText: "20 000 - 28 000 PLN/month",
+      location: undefined,
+      offerMarkdown: undefined,
+      matchScore: undefined,
+      matchReason: undefined,
+      summary: undefined,
+      status: "matched",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-03T00:00:00.000Z"
     });
   });
 });

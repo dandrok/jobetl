@@ -170,6 +170,58 @@ export class SQLiteJobRepository {
       );
   }
 
+  upsertStoredJob(job: StoredJob): void {
+    this.database
+      .prepare(`
+        INSERT INTO jobs (
+          external_id,
+          source,
+          url,
+          title,
+          company,
+          salary_text,
+          location,
+          offer_markdown,
+          match_score,
+          match_reason,
+          summary,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(external_id) DO UPDATE SET
+          source = excluded.source,
+          url = excluded.url,
+          title = excluded.title,
+          company = excluded.company,
+          salary_text = excluded.salary_text,
+          location = excluded.location,
+          offer_markdown = excluded.offer_markdown,
+          match_score = excluded.match_score,
+          match_reason = excluded.match_reason,
+          summary = excluded.summary,
+          status = excluded.status,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at
+      `)
+      .run(
+        job.externalId,
+        job.source,
+        job.url,
+        job.title,
+        job.company,
+        job.salaryText ?? null,
+        job.location ?? null,
+        job.offerMarkdown ?? null,
+        job.matchScore ?? null,
+        job.matchReason ?? null,
+        job.summary ?? null,
+        job.status,
+        job.createdAt,
+        job.updatedAt
+      );
+  }
+
   listJobs(): StoredJob[] {
     const rows = this.database
       .prepare("SELECT * FROM jobs ORDER BY updated_at DESC")
