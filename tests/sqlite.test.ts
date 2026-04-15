@@ -61,6 +61,69 @@ describe("SQLiteJobRepository", () => {
     });
   });
 
+  test("does not bump updatedAt when rediscovered listing data is unchanged", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+
+    const repository = createRepository();
+    const listing = {
+      externalId: "justjoinit:/job-offer/acme",
+      source: "justjoinit" as const,
+      url: "https://justjoin.it/job-offer/acme",
+      title: "Senior Node Engineer",
+      company: "Acme",
+      salaryText: "20 000 - 28 000 PLN/month",
+      location: "Remote"
+    };
+
+    repository.upsertDiscoveredJob(listing);
+    const firstUpdatedAt = repository.listJobs()[0].updatedAt;
+
+    vi.setSystemTime(new Date("2024-01-01T00:05:00.000Z"));
+    repository.upsertDiscoveredJob(listing);
+
+    expect(repository.listJobs()[0]).toMatchObject({
+      externalId: listing.externalId,
+      updatedAt: firstUpdatedAt
+    });
+  });
+
+  test("bumps updatedAt when rediscovered listing data changed", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+
+    const repository = createRepository();
+
+    repository.upsertDiscoveredJob({
+      externalId: "justjoinit:/job-offer/acme",
+      source: "justjoinit",
+      url: "https://justjoin.it/job-offer/acme",
+      title: "Senior Node Engineer",
+      company: "Acme",
+      salaryText: "20 000 - 28 000 PLN/month",
+      location: "Remote"
+    });
+    const firstUpdatedAt = repository.listJobs()[0].updatedAt;
+
+    vi.setSystemTime(new Date("2024-01-01T00:05:00.000Z"));
+    repository.upsertDiscoveredJob({
+      externalId: "justjoinit:/job-offer/acme",
+      source: "justjoinit",
+      url: "https://justjoin.it/job-offer/acme",
+      title: "Senior Node Engineer",
+      company: "Acme Updated",
+      salaryText: "22 000 - 30 000 PLN/month",
+      location: "Remote"
+    });
+
+    expect(repository.listJobs()[0]).toMatchObject({
+      externalId: "justjoinit:/job-offer/acme",
+      company: "Acme Updated",
+      salaryText: "22 000 - 30 000 PLN/month"
+    });
+    expect(repository.listJobs()[0].updatedAt).not.toBe(firstUpdatedAt);
+  });
+
   test("returns job status for skip decisions and undefined for missing jobs", () => {
     const repository = createRepository();
 

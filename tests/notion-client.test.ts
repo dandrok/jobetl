@@ -13,6 +13,7 @@ function jsonResponse(body: unknown): Response {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("NotionDatabaseClient", () => {
@@ -132,5 +133,46 @@ describe("NotionDatabaseClient", () => {
       ],
       nextCursor: "cursor-2"
     });
+  });
+
+  test("retries transient 504 responses before succeeding", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("<html>timeout</html>", {
+          status: 504,
+          statusText: "Gateway Timeout",
+          headers: {
+            "content-type": "text/html"
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          properties: {
+            Name: { type: "title" },
+            "External ID": { type: "rich_text" },
+            URL: { type: "url" },
+            Status: { type: "status" }
+          }
+        })
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new NotionDatabaseClient({
+      notionToken: "secret_test",
+      notionDatabaseId: "database-id"
+    });
+
+    const schemaPromise = client.getSchema();
+    await vi.runAllTimersAsync();
+
+    await expect(schemaPromise).resolves.toEqual({
+      statusKind: "status"
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

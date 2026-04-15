@@ -9,6 +9,9 @@ import type { ExistingNotionJob, NotionSyncClient } from "./sync.js";
 
 const NOTION_API_BASE_URL = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
+const MAX_NOTION_REQUEST_ATTEMPTS = 3;
+const BASE_RETRY_DELAY_MS = 500;
+const MAX_RETRY_DELAY_MS = 5_000;
 
 export interface NotionDatabasePage {
   id: string;
@@ -31,6 +34,44 @@ interface NotionQueryResponse {
   }>;
   has_more?: boolean;
   next_cursor?: string | null;
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function isRetriableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function parseRetryAfterMilliseconds(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const at = Date.parse(value);
+  if (Number.isNaN(at)) {
+    return undefined;
+  }
+
+  return Math.max(at - Date.now(), 0);
+}
+
+function getRetryDelayMilliseconds(response: Response, attempt: number): number {
+  const retryAfter = parseRetryAfterMilliseconds(response.headers.get("retry-after"));
+  if (retryAfter !== undefined) {
+    return retryAfter;
+  }
+
+  const exponentialDelay = BASE_RETRY_DELAY_MS * 2 ** (attempt - 1);
+  return Math.min(exponentialDelay, MAX_RETRY_DELAY_MS);
 }
 
 function readRichTextPlainText(property: unknown): string | undefined {
@@ -158,27 +199,38 @@ export class NotionDatabaseClient implements NotionSyncClient {
   }
 
   private async request<T = unknown>(path: string, init: RequestInit): Promise<T> {
-    const response = await fetch(`${NOTION_API_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${this.env.notionToken}`,
-        "Notion-Version": NOTION_VERSION,
-        "Content-Type": "application/json",
-        ...(init.headers ?? {})
-      }
-    });
+    for (let attempt = 1; attempt <= MAX_NOTION_REQUEST_ATTEMPTS; attempt += 1) {
+      const response = await fetch(`${NOTION_API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${this.env.notionToken}`,
+          "Notion-Version": NOTION_VERSION,
+          "Content-Type": "application/json",
+          ...(init.headers ?? {})
+        }
+      });
 
-    if (!response.ok) {
+      if (response.ok) {
+        if (response.status === 204) {
+          return undefined as T;
+        }
+
+        return (await response.json()) as T;
+      }
+
       const body = await response.text();
+      const isLastAttempt = attempt === MAX_NOTION_REQUEST_ATTEMPTS;
+
+      if (!isLastAttempt && isRetriableStatus(response.status)) {
+        await sleep(getRetryDelayMilliseconds(response, attempt));
+        continue;
+      }
+
       throw new Error(
         `Notion request failed (${response.status} ${response.statusText}): ${body}`
       );
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
+    throw new Error("Notion request failed after exhausting retries.");
   }
 }

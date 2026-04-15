@@ -119,7 +119,17 @@ export class SQLiteJobRepository {
           company = excluded.company,
           salary_text = excluded.salary_text,
           location = excluded.location,
-          updated_at = excluded.updated_at
+          updated_at = CASE
+            WHEN
+              jobs.source IS excluded.source AND
+              jobs.url IS excluded.url AND
+              jobs.title IS excluded.title AND
+              jobs.company IS excluded.company AND
+              jobs.salary_text IS excluded.salary_text AND
+              jobs.location IS excluded.location
+            THEN jobs.updated_at
+            ELSE excluded.updated_at
+          END
       `)
       .run(
         job.externalId,
