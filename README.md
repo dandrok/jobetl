@@ -1,130 +1,96 @@
 # JobETL
 
-`jobetl` is a AI-powered job scraping and matching tool.
+JobETL helps you turn job boards into a short list of jobs that actually fit your CV.
 
-It collects job offers from selected websites, turns full offers into markdown, uses LLM-based matching to compare them against your CV, and stores the results in a local SQLite database so you can review matched jobs in one place.
+It discovers listings from supported sources, fetches each full offer as markdown, scores it against your resume with AI, and stores the result in a local SQLite database. Optional Notion sync lets the same data flow through GitHub Actions.
 
-The current flow is:
+## The Idea In 30 Seconds
 
-1. Discover listings from all enabled sources with source-side filters.
-2. Save discovered listings into a local SQLite database.
-3. Skip jobs already finalized as `matched` or `rejected` on later runs.
-4. Fetch offer pages through Jina Reader with bounded concurrency.
-5. Score fetched offers against your CV with bounded concurrency while fetching continues.
-6. Update the same SQLite rows as `matched`, `rejected`, or `error`.
+Simple use case: you want a daily list of jobs worth reviewing instead of opening every offer by hand.
 
-## MVP scope
+- choose sources and filters
+- point the app at your CV in markdown
+- run the pipeline
+- review only the jobs that passed the match threshold
+
+## Stack
 
 - Runtime: Node.js + TypeScript
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`
-- Offer extraction: Jina Reader
-- Matching: AI SDK + DeepSeek
-- Storage: local SQLite database with optional Notion sync
-- Execution: local CLI and daily GitHub Actions workflow
+- Full-offer extraction: Jina Reader
+- AI matching: DeepSeek `deepseek-chat` via the AI SDK
+- Storage: local SQLite (`./data/jobetl.db`)
+- Optional sync: Notion
+- Automation: GitHub Actions
 
-## Project layout
+Current code uses DeepSeek for scoring. No OpenAI key is required.
 
-```text
-src/
-  cli.ts
-  config.ts
-  env.ts
-  jina/
-  matching/
-  pipeline/
-  report.ts
-  sources/
-  storage/
-tests/
-docs/
+## Flow
+
+```mermaid
+flowchart LR
+    A[Job board listing pages] --> B[Source adapters fetch and parse listing HTML]
+    B --> C[Save discovered jobs in SQLite]
+    C --> D{Already matched or rejected?}
+    D -->|yes| E[Skip]
+    D -->|no| F[Send job URL to Jina Reader]
+    F --> G[Receive cleaned job-offer markdown]
+    G --> H[Score against cv.md with DeepSeek]
+    H --> I{score >= matchThreshold}
+    I -->|yes| J[Save as matched]
+    I -->|no| K[Save as rejected]
+    J --> L[Optional sync to Notion]
+    K --> L
 ```
 
-## Setup
+## How Jina Reader Works In This Project
 
-### 1. Install dependencies
+Jina Reader is used only for the full job page, not for listing discovery.
+
+1. Each source adapter fetches listing/search pages directly from the job board.
+2. The adapter extracts lightweight metadata such as title, company, salary, location, and the job URL.
+3. For every job that still needs processing, the app calls `https://r.jina.ai/http://<job-url>` with `JINA_API_KEY`.
+4. Jina Reader visits the original job page and returns a cleaned markdown version of the offer.
+5. That markdown is sent to DeepSeek together with your CV markdown for scoring.
+
+This means the project does not need a custom detail-page scraper for every source. It only needs source-specific listing discovery plus one shared Jina fetch step for full offers.
+
+## API Keys
+
+Required for the core pipeline:
+
+- `JINA_API_KEY`
+- `DEEPSEEK_API_KEY`
+
+Required only if you use Notion sync or the bundled GitHub Actions workflow:
+
+- `NOTION_TOKEN`
+- `NOTION_DATABASE_ID`
+
+The same names are used for local env vars and GitHub Actions secrets.
+
+## Quick Setup
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-### 2. Configure secrets
-
-Copy `.env.example` values into your own environment source.
-
-Required pipeline variables:
-
-- `JINA_API_KEY`
-- `DEEPSEEK_API_KEY`
-
-Required Notion sync variables:
-
-- `NOTION_TOKEN`
-- `NOTION_DATABASE_ID`
-
-For local runs you can export them in your shell:
+Create your local env file and CV file:
 
 ```bash
-export JINA_API_KEY=...
-export DEEPSEEK_API_KEY=...
-export NOTION_TOKEN=...
-export NOTION_DATABASE_ID=...
+cp .env.example .env
+cp cv.example.md cv.md
 ```
 
-### 3. Add your CV markdown
+Then:
 
-Create `cv.md` based on [`cv.example.md`](/home/dandrok/git/jobetl/cv.example.md) and keep `resumeMarkdownPath` pointed at it in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
+1. Fill `.env` with your keys.
+2. Update `resumeMarkdownPath` in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts) to `./cv.md`.
+3. Adjust source filters, `matchThreshold`, and concurrency in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
 
-### 4. Set your preferences
-
-Edit [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts):
-
-- `databasePath`
-- `keyword`
-- `categorySlug`
-- `location`
-- `workingMode`
-- `minSalary`
-- `withSalaryOnly`
-- `matchThreshold`
-- `maxListings`
-- `fetchConcurrency`
-- `scoreConcurrency`
-
-## Local SQLite storage
-
-The active store is a local SQLite file, by default:
-
-```text
-./data/jobetl.db
-```
-
-The `jobs` table stores:
-
-- external id
-- source
-- url
-- title
-- company
-- salary text
-- location
-- offer markdown
-- match score
-- match reason
-- summary
-- status
-- created / updated timestamps
-
-Status values currently used:
-
-- `discovered`
-- `fetching`
-- `fetched`
-- `scoring`
-- `matched`
-- `rejected`
-- `error`
-
-## Running locally
+## Run
 
 Run all enabled sources:
 
@@ -140,102 +106,35 @@ npm run dev -- --source nofluffjobs
 npm run dev -- --source bulldogjob
 ```
 
-Expected result:
-
-- the pipeline discovers listing pages first,
-- stores listings in SQLite,
-- skips jobs already finalized as `matched` or `rejected`,
-- fetches and scores offers concurrently with bounded worker counts,
-- updates rows as `matched`, `rejected`, or `error`,
-- prints a JSON summary with run counters `scanned`, `skipped`, `fetched`, `matched`, `rejected`, `failed`, plus `stored` as the cumulative total currently present in the local database after the run.
-
-Source filtering changes only the discovery stage. SQLite, Jina fetch, and DeepSeek scoring remain shared.
-
-## Reviewing local matches
+Review the best saved matches:
 
 ```bash
 npm run report
 ```
 
-This prints the best locally stored matches from SQLite.
-
-## Syncing to Notion
-
-```bash
-npm run sync:notion
-```
-
-This command:
-
-- reads all jobs from the local SQLite database
-- validates the target Notion database schema
-- creates new Notion pages for unseen `External ID` values
-- updates existing Notion pages when the local `Updated At` value changed
-- leaves already up-to-date pages unchanged
-
-Recommended Notion properties:
-
-- `Name` as title
-- `External ID` as rich text
-- `URL` as url
-- `Status` as status or select
-- `Source` as select or rich text
-- `Company` as rich text
-- `Salary` as rich text
-- `Location` as rich text
-- `Match Score` as number
-- `Match Reason` as rich text
-- `Summary` as rich text
-- `Created At` as date or rich text
-- `Updated At` as date or rich text
-
-## Notion hydration
+Optional Notion sync commands:
 
 ```bash
 npm run import:notion
+npm run sync:notion
 ```
 
-This command:
+## GitHub Actions
 
-- paginates through the configured Notion database
-- rebuilds local SQLite rows by `External ID`
-- preserves stored statuses and match metadata when present
-- skips malformed rows without aborting the entire import
+The repo includes [`daily-crawl.yml`](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml).
 
-This is mainly useful for GitHub Actions, where the runner starts from an empty local filesystem and needs to rebuild SQLite state before crawling.
+- Trigger: daily schedule plus manual `workflow_dispatch`
+- Secrets: `JINA_API_KEY`, `DEEPSEEK_API_KEY`, `NOTION_TOKEN`, `NOTION_DATABASE_ID`
+- Workflow order:
+  1. `npm run import:notion`
+  2. `npm run dev`
+  3. `npm run sync:notion`
 
-## GitHub Actions automation
+The current workflow expects Notion to be configured, because GitHub runners start with an empty filesystem and rebuild local SQLite state from Notion before crawling.
 
-The repository includes [daily-crawl.yml](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml), which runs once per day and also supports manual `workflow_dispatch`.
-
-Required GitHub repository secrets:
-
-- `JINA_API_KEY`
-- `DEEPSEEK_API_KEY`
-- `NOTION_TOKEN`
-- `NOTION_DATABASE_ID`
-
-Workflow order:
-
-1. `npm run import:notion`
-2. `npm run dev`
-3. `npm run sync:notion`
-
-## Verification
+## Verify
 
 ```bash
 npm test
 npm run build
 ```
-
-## Current limitations
-
-- The current adapters are intentionally narrow and should be hardened against future markup changes.
-- The current pipeline is bounded-concurrency only; it does not auto-scale or prioritize sources.
-- The pipeline does not yet implement retries, backoff, or result caching.
-
-## Next extensions
-
-- Add more source adapters behind the same interface
-- Expand source-side filter coverage
-- Add retry/backoff for Jina and DeepSeek
