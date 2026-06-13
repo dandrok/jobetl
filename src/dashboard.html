@@ -359,9 +359,18 @@
     let allJobs = [];
     let activeJobId = null;
 
+    const thresholdPercent = Number('__MATCH_THRESHOLD__') || 78;
+
     async function fetchJobs() {
-      const res = await fetch('/api/jobs');
-      allJobs = await res.json();
+      try {
+        const res = await fetch('/api/jobs');
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status} ${res.statusText}`);
+        allJobs = await res.json();
+      } catch (err) {
+        allJobs = [];
+        console.error(err);
+        document.getElementById('emptyState').innerText = 'Failed to load jobs: ' + err.message;
+      }
       renderSidebar();
     }
 
@@ -390,19 +399,32 @@
 
       filtered.forEach(job => {
         const score = job.matchScore ? (job.matchScore * 100).toFixed(0) : 0;
-        const scoreClass = score >= 78 ? 'score-high' : 'score-low';
+        const scoreClass = score >= thresholdPercent ? 'score-high' : 'score-low';
         
         const el = document.createElement('div');
         el.className = `job-item ${job.externalId === activeJobId ? 'active' : ''}`;
         el.onclick = () => selectJob(job.externalId);
         
-        el.innerHTML = `
-          <div class="job-item-header">
-            <div class="job-item-company">${job.company}</div>
-            <div class="job-item-score ${scoreClass}">${score}%</div>
-          </div>
-          <div class="job-item-title">${job.title}</div>
-        `;
+        const header = document.createElement('div');
+        header.className = 'job-item-header';
+        
+        const company = document.createElement('div');
+        company.className = 'job-item-company';
+        company.textContent = job.company;
+        
+        const scoreEl = document.createElement('div');
+        scoreEl.className = `job-item-score ${scoreClass}`;
+        scoreEl.textContent = `${score}%`;
+        
+        header.appendChild(company);
+        header.appendChild(scoreEl);
+        
+        const title = document.createElement('div');
+        title.className = 'job-item-title';
+        title.textContent = job.title;
+        
+        el.appendChild(header);
+        el.appendChild(title);
         list.appendChild(el);
       });
     }
@@ -423,7 +445,7 @@
       const score = job.matchScore ? (job.matchScore * 100).toFixed(0) : 0;
       const scoreEl = document.getElementById('detScore');
       scoreEl.innerText = `${score}%`;
-      scoreEl.style.color = score >= 78 ? 'var(--success)' : 'var(--text-main)';
+      scoreEl.style.color = score >= thresholdPercent ? 'var(--success)' : 'var(--text-main)';
 
       document.getElementById('detSource').innerText = job.source;
       

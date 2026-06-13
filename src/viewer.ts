@@ -7,14 +7,22 @@ import { SQLiteJobRepository } from "./storage/sqlite-job-repository.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+let DASHBOARD_HTML = "";
+try {
+  const rawHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
+  DASHBOARD_HTML = rawHtml.replace(/__MATCH_THRESHOLD__/g, String(Math.round(config.matchThreshold * 100)));
+} catch (e) {
+  console.error("Failed to load dashboard.html:", e);
+  process.exit(1);
+}
+
 function startViewer() {
   const repository = new SQLiteJobRepository(config.databasePath);
 
   const server = createServer((req, res) => {
     if (req.url === "/") {
       res.writeHead(200, { "Content-Type": "text/html" });
-      const html = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
-      res.end(html);
+      res.end(DASHBOARD_HTML);
     } else if (req.url === "/api/jobs") {
       res.writeHead(200, { "Content-Type": "application/json" });
       const jobs = repository.listJobs().filter(j => j.status === "matched" || j.status === "rejected");
@@ -23,6 +31,11 @@ function startViewer() {
       res.writeHead(404);
       res.end("Not found");
     }
+  });
+
+  server.on("error", (e) => {
+    console.error("Server error:", e);
+    process.exit(1);
   });
 
   server.listen(3000, () => {

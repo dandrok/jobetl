@@ -14,7 +14,7 @@
     "sync:notion": "tsx src/sync-notion.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:clear": "rm -f data/jobetl.db",
+    "db:clear": "node -e \"const fs=require('fs'); if(fs.existsSync('data/jobetl.db')) fs.unlinkSync('data/jobetl.db');\"",
     "dashboard": "tsx src/viewer.ts"
   },
   "dependencies": {
