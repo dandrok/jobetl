@@ -13,7 +13,9 @@
     "import:notion": "tsx src/import-notion.ts",
     "sync:notion": "tsx src/sync-notion.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:clear": "node -e \"const fs=require('fs'); if(fs.existsSync('data/jobetl.db')) fs.unlinkSync('data/jobetl.db');\"",
+    "dashboard": "tsx src/viewer.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.29",

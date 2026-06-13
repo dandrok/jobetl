@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobETL Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0a0a0a;
+      --surface-hover: #141414;
+      --border: #1f1f1f;
+      --text-main: #ffffff;
+      --text-muted: #888888;
+      --accent: #ffffff;
+      --success: #10b981;
+    }
+    
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* Sidebar (Master) */
+    .sidebar {
+      width: 400px;
+      height: 100vh;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .sidebar-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .brand {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    select, input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      outline: none;
+      flex: 1;
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888888%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      background-size: 12px;
+      padding-right: 2rem;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--text-muted);
+    }
+
+    .search-wrapper {
+      position: relative;
+    }
+
+    .search-wrapper svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .search-wrapper input {
+      padding-left: 2.2rem;
+      width: 100%;
+    }
+
+    .job-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .job-list::-webkit-scrollbar { width: 4px; }
+    .job-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .job-item {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .job-item:hover { background: var(--surface-hover); }
+    .job-item.active { background: var(--surface); border-left: 3px solid var(--accent); padding-left: calc(1.5rem - 3px); }
+
+    .job-item-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+      align-items: center;
+    }
+
+    .job-item-company {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .job-item-score {
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .score-high { color: var(--success); }
+    .score-low { color: var(--text-muted); }
+
+    .job-item-title {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Detail View */
+    .detail {
+      flex: 1;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .detail-content {
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 4rem 3rem;
+      display: none;
+    }
+
+    .detail-header {
+      margin-bottom: 3rem;
+    }
+
+    .detail-company {
+      font-size: 1rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .detail-title {
+      font-size: 2.5rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+    }
+
+    .detail-meta {
+      display: flex;
+      gap: 1.5rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .meta-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .meta-value {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .detail-section {
+      margin-top: 3rem;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .ai-reason {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text-main);
+      background: var(--surface);
+      padding: 1.5rem 2rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .apply-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent);
+      color: var(--bg);
+      text-decoration: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      margin-top: 3rem;
+      transition: opacity 0.2s;
+    }
+
+    .apply-btn:hover { opacity: 0.9; }
+
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+        JobETL
+      </div>
+      
+      <div class="controls-row">
+        <select id="statusFilter">
+          <option value="matched">Matched Only</option>
+          <option value="all">All Evaluated</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select id="sortFilter">
+          <option value="score">Sort: High Score</option>
+          <option value="recent">Sort: Newest</option>
+        </select>
+      </div>
+
+      <div class="search-wrapper">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="searchInput" placeholder="Search title or company...">
+      </div>
+    </div>
+    <div class="job-list" id="jobList">
+      <!-- Job items injected here -->
+    </div>
+  </div>
+
+  <div class="detail">
+    <div class="detail-empty" id="emptyState">
+      Select a job from the list to view intelligence
+    </div>
+    <div class="detail-content" id="detailContent">
+      <div class="detail-header">
+        <div class="detail-company">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span id="detCompany">Company Name</span>
+        </div>
+        <h1 class="detail-title" id="detTitle">Job Title</h1>
+        
+        <div class="detail-meta">
+          <div class="meta-item">
+            <span class="meta-label">Match Score</span>
+            <span class="meta-value" id="detScore">95%</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Source</span>
+            <span class="meta-value" id="detSource">nofluffjobs</span>
+          </div>
+          <div class="meta-item" id="metaLocation">
+            <span class="meta-label">Location</span>
+            <span class="meta-value" id="detLocation">Remote</span>
+          </div>
+          <div class="meta-item" id="metaSalary">
+            <span class="meta-label">Salary</span>
+            <span class="meta-value" id="detSalary">20k - 30k PLN</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          AI Reasoning
+        </div>
+        <div class="ai-reason" id="detReason">
+          DeepSeek reasoning goes here...
+        </div>
+      </div>
+
+      <a href="#" target="_blank" class="apply-btn" id="detUrl">
+        View Original Posting
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    let allJobs = [];
+    let activeJobId = null;
+
+    const thresholdPercent = Number('__MATCH_THRESHOLD__') || 78;
+
+    async function fetchJobs() {
+      try {
+        const res = await fetch('/api/jobs');
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status} ${res.statusText}`);
+        allJobs = await res.json();
+      } catch (err) {
+        allJobs = [];
+        console.error(err);
+        document.getElementById('emptyState').innerText = 'Failed to load jobs: ' + err.message;
+      }
+      renderSidebar();
+    }
+
+    function renderSidebar() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const status = document.getElementById('statusFilter').value;
+      const sort = document.getElementById('sortFilter').value;
+      
+      const list = document.getElementById('jobList');
+      list.innerHTML = '';
+
+      let filtered = allJobs.filter(job => {
+        if (status !== 'all' && job.status !== status) return false;
+        if (search) {
+          return job.title.toLowerCase().includes(search) || 
+                 job.company.toLowerCase().includes(search);
+        }
+        return true;
+      });
+
+      if (sort === 'score') {
+        filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+      } else {
+        filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      }
+
+      filtered.forEach(job => {
+        const score = job.matchScore ? (job.matchScore * 100).toFixed(0) : 0;
+        const scoreClass = score >= thresholdPercent ? 'score-high' : 'score-low';
+        
+        const el = document.createElement('div');
+        el.className = `job-item ${job.externalId === activeJobId ? 'active' : ''}`;
+        el.onclick = () => selectJob(job.externalId);
+        
+        const header = document.createElement('div');
+        header.className = 'job-item-header';
+        
+        const company = document.createElement('div');
+        company.className = 'job-item-company';
+        company.textContent = job.company;
+        
+        const scoreEl = document.createElement('div');
+        scoreEl.className = `job-item-score ${scoreClass}`;
+        scoreEl.textContent = `${score}%`;
+        
+        header.appendChild(company);
+        header.appendChild(scoreEl);
+        
+        const title = document.createElement('div');
+        title.className = 'job-item-title';
+        title.textContent = job.title;
+        
+        el.appendChild(header);
+        el.appendChild(title);
+        list.appendChild(el);
+      });
+    }
+
+    function selectJob(id) {
+      activeJobId = id;
+      renderSidebar(); // update active class
+
+      const job = allJobs.find(j => j.externalId === id);
+      if (!job) return;
+
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('detailContent').style.display = 'block';
+
+      document.getElementById('detCompany').innerText = job.company;
+      document.getElementById('detTitle').innerText = job.title;
+      
+      const score = job.matchScore ? (job.matchScore * 100).toFixed(0) : 0;
+      const scoreEl = document.getElementById('detScore');
+      scoreEl.innerText = `${score}%`;
+      scoreEl.style.color = score >= thresholdPercent ? 'var(--success)' : 'var(--text-main)';
+
+      document.getElementById('detSource').innerText = job.source;
+      
+      if (job.location) {
+        document.getElementById('metaLocation').style.display = 'flex';
+        document.getElementById('detLocation').innerText = job.location;
+      } else {
+        document.getElementById('metaLocation').style.display = 'none';
+      }
+
+      if (job.salaryText) {
+        document.getElementById('metaSalary').style.display = 'flex';
+        document.getElementById('detSalary').innerText = job.salaryText;
+      } else {
+        document.getElementById('metaSalary').style.display = 'none';
+      }
+
+      document.getElementById('detReason').innerText = job.matchReason || 'No AI reasoning provided for this job.';
+      document.getElementById('detUrl').href = job.url;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', renderSidebar);
+    document.getElementById('statusFilter').addEventListener('change', renderSidebar);
+    document.getElementById('sortFilter').addEventListener('change', renderSidebar);
+    
+    fetchJobs();
+  </script>
+</body>
+</html>
