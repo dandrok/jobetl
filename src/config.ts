@@ -2,7 +2,7 @@ import type { RunConfig } from "./types.js";
 
 export const config: RunConfig = {
   databasePath: "./data/jobetl.db",
-  resumeMarkdownPath: "./cv.example.md",
+  resumeMarkdownPath: "./cv.md",
   matchThreshold: 0.78,
   fetchConcurrency: 2,
   scoreConcurrency: 2,
@@ -13,8 +13,6 @@ export const config: RunConfig = {
       maxListings: 200,
       filters: {
         keyword: "javascript",
-        categorySlug: "javascript",
-        location: "warszawa",
         withSalaryOnly: false
       }
     },
@@ -23,8 +21,7 @@ export const config: RunConfig = {
       baseUrl: "https://nofluffjobs.com",
       maxListings: 200,
       filters: {
-        keyword: "javascript",
-        location: "warszawa"
+        keyword: "javascript"
       }
     },
     bulldogjob: {
