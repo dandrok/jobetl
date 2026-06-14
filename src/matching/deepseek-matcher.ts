@@ -4,8 +4,6 @@ import { z } from "zod";
 
 import type { JobOffer, MatchResult } from "../types.js";
 
-// Suppress Vercel AI SDK compatibility warnings when deepseek injects JSON schema
-(globalThis as any).AI_SDK_LOG_WARNINGS = false;
 
 const matchSchema = z.object({
   score: z.number().min(0).max(1),
@@ -21,24 +19,31 @@ export class DeepSeekMatcher {
   }
 
   async scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult> {
-    const result = await generateObject({
-      model: this.provider("deepseek-v4-flash"),
-      schema: matchSchema,
-      prompt: [
-        "You are scoring how well a job offer matches a software engineer CV.",
-        "Return a score between 0 and 1, a short reason, and a short summary.",
-        "",
-        "CV MARKDOWN:",
-        resumeMarkdown,
-        "",
-        "JOB OFFER MARKDOWN:",
-        job.offerMarkdown
-      ].join("\n")
-    });
+    const prevWarnings = (globalThis as any).AI_SDK_LOG_WARNINGS;
+    (globalThis as any).AI_SDK_LOG_WARNINGS = false;
+    
+    try {
+      const result = await generateObject({
+        model: this.provider("deepseek-v4-flash"),
+        schema: matchSchema,
+        prompt: [
+          "You are scoring how well a job offer matches a software engineer CV.",
+          "Return a score between 0 and 1, a short reason, and a short summary.",
+          "",
+          "CV MARKDOWN:",
+          resumeMarkdown,
+          "",
+          "JOB OFFER MARKDOWN:",
+          job.offerMarkdown
+        ].join("\n")
+      });
 
-    return {
-      ...result.object,
-      shouldSave: true
-    };
+      return {
+        ...result.object,
+        shouldSave: true
+      };
+    } finally {
+      (globalThis as any).AI_SDK_LOG_WARNINGS = prevWarnings;
+    }
   }
 }

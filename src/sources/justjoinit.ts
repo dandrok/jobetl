@@ -140,11 +140,11 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
       const externalId = `${this.source}:${new URL(url).pathname}`;
       const parent = $(element).parent();
       const textNodes = extractLeafTexts($, parent);
-      
-      if (textNodes.length < 3) return;
 
       const titleAttr = $(element).attr("title") || "";
-      const title = $("<div>").html(titleAttr).text().replace(/^View offer\s+/i, "").trim() || undefined;
+      const title = cheerio.load(titleAttr).text().replace(/^View offer\s+/i, "").trim() || undefined;
+
+      if (textNodes.length < 3 && !title) return;
 
       let salaryText: string | undefined;
       let company: string | undefined;
@@ -154,21 +154,19 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
         const val = textNodes[i];
 
         if (!salaryText && isSalaryText(val)) {
-          if (i > 0 && /[\\d\\s,-]+/.test(textNodes[i-1])) {
-            salaryText = textNodes[i-1] + " " + val;
-          } else {
-            salaryText = val;
+          const combined = (i > 0 && /[\d\s,-]+/.test(textNodes[i-1])) ? textNodes[i-1] + " " + val : val;
+          if (!/Undisclosed/i.test(combined)) {
+            salaryText = combined;
           }
-          if (/Undisclosed/i.test(salaryText)) salaryText = undefined;
           continue;
         }
 
-        if (!company && !isIgnorableText(val) && val !== title && !isSalaryText(val) && !/^\\d/.test(val)) {
+        if (!company && !isIgnorableText(val) && val !== title && !isSalaryText(val) && !/^\d/.test(val)) {
           company = val;
           continue;
         }
 
-        if (company && !location && !isIgnorableText(val) && val !== title && val !== company && !isSalaryText(val) && !/^\\d/.test(val)) {
+        if (company && !location && !isIgnorableText(val) && val !== title && val !== company && !isSalaryText(val) && !/^\d/.test(val)) {
           location = val;
           break;
         }
