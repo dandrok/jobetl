@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JobETL Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -636,8 +636,8 @@
       <div class="drawer-tags">
         <div class="drawer-tag" id="drawScore" style="color: var(--success);">95%</div>
         <div class="drawer-tag" id="drawSource">Source</div>
-        <div class="drawer-tag" id="drawLocation" class="hidden">Loc</div>
-        <div class="drawer-tag" id="drawSalary" class="hidden">Sal</div>
+        <div class="drawer-tag hidden" id="drawLocation">Loc</div>
+        <div class="drawer-tag hidden" id="drawSalary">Sal</div>
       </div>
     </div>
     <div class="drawer-content">
@@ -764,12 +764,22 @@
       const sources = [...new Set(allJobs.map(j => j.source))].filter(Boolean);
       selectedSources = new Set(sources);
       
-      container.innerHTML = sources.map(source => `
-        <label class="source-filter-label">
-          <input type="checkbox" class="source-filter-checkbox" value="${source}" checked onchange="toggleSource('${source}', this.checked)">
-          ${source}
-        </label>
-      `).join('');
+      container.innerHTML = '';
+      sources.forEach(source => {
+        const label = document.createElement('label');
+        label.className = 'source-filter-label';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'source-filter-checkbox';
+        checkbox.value = source;
+        checkbox.checked = true;
+        checkbox.onchange = (e) => toggleSource(source, e.target.checked);
+        
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(' ' + source));
+        container.appendChild(label);
+      });
     }
 
     function toggleSource(source, isChecked) {
@@ -787,7 +797,7 @@
         if (currentFilter !== 'all' && job.status !== currentFilter) return false;
         if (job.source && !selectedSources.has(job.source)) return false;
         if (search) {
-          return job.title.toLowerCase().includes(search) || job.company.toLowerCase().includes(search);
+          return (job.title ?? '').toLowerCase().includes(search) || (job.company ?? '').toLowerCase().includes(search);
         }
         return true;
       });
@@ -829,13 +839,19 @@
         if (job.location) {
           const loc = document.createElement('div');
           loc.className = 'meta-chip';
-          loc.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> <span>${job.location}</span>`;
+          loc.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> `;
+          const locSpan = document.createElement('span');
+          locSpan.textContent = job.location;
+          loc.appendChild(locSpan);
           colMeta.appendChild(loc);
         }
         if (job.salaryText) {
           const sal = document.createElement('div');
           sal.className = 'meta-chip';
-          sal.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span>${job.salaryText}</span>`;
+          sal.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> `;
+          const salSpan = document.createElement('span');
+          salSpan.textContent = job.salaryText;
+          sal.appendChild(salSpan);
           colMeta.appendChild(sal);
         }
         row.appendChild(colMeta);
@@ -875,7 +891,17 @@
       else { salEl.style.display = 'none'; }
 
       document.getElementById('drawReason').textContent = job.matchReason || 'No reasoning provided.';
-      document.getElementById('drawUrl').href = job.url;
+      
+      let safeUrl = '#';
+      try {
+        const parsedUrl = new URL(job.url);
+        if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+          safeUrl = job.url;
+        }
+      } catch (e) {
+        // Invalid URL
+      }
+      document.getElementById('drawUrl').href = safeUrl;
 
       document.getElementById('drawerOverlay').classList.add('open');
       document.getElementById('detailDrawer').classList.add('open');
