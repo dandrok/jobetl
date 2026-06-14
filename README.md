@@ -18,7 +18,7 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 - Runtime: Node.js + TypeScript
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`
 - Full-offer extraction: Jina Reader
-- AI matching: DeepSeek `deepseek-chat` via the AI SDK
+- AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
 - Storage: local SQLite (`./data/jobetl.db`)
 - Optional sync: Notion
 - Automation: GitHub Actions
@@ -28,19 +28,31 @@ Current code uses DeepSeek for scoring. No OpenAI key is required.
 ## Flow
 
 ```mermaid
-flowchart LR
-    A[Job board listing pages] --> B[Source adapters fetch and parse listing HTML]
-    B --> C[Save discovered jobs in SQLite]
-    C --> D{Already matched or rejected?}
-    D -->|yes| E[Skip]
-    D -->|no| F[Send job URL to Jina Reader]
-    F --> G[Receive cleaned job-offer markdown]
-    G --> H[Score against cv.md with DeepSeek]
-    H --> I{score >= matchThreshold}
-    I -->|yes| J[Save as matched]
-    I -->|no| K[Save as rejected]
-    J --> L[Optional sync to Notion]
-    K --> L
+flowchart TD
+    subgraph Discovery [1. Discovery Phase]
+        A[Job Boards] -->|Scrape HTML| B[Source Adapters]
+        B -->|Extract Job Links| C[(Local SQLite)]
+    end
+
+    subgraph Extraction [2. Content Extraction]
+        C --> D{Already Processed?}
+        D -->|No| F[Jina Reader API]
+        F -->|Clean Markdown| G[Raw Job Content]
+    end
+
+    subgraph Intelligence [3. AI Evaluation]
+        G --> H[Deepseek V4 Flash]
+        H -->|Compare against CV| I{Score >= Threshold?}
+        I -->|Yes| J[Mark as Matched]
+        I -->|No| K[Mark as Rejected]
+    end
+
+    subgraph Integration [4. Sync & Dashboard]
+        J --> L[(Notion Database)]
+        K --> L
+        J --> M[Web Dashboard UI]
+        K --> M
+    end
 ```
 
 ## How Jina Reader Works In This Project

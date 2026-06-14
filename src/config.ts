@@ -4,8 +4,8 @@ export const config: RunConfig = {
   databasePath: "./data/jobetl.db",
   resumeMarkdownPath: "./cv.md",
   matchThreshold: 0.78,
-  fetchConcurrency: 2,
-  scoreConcurrency: 2,
+  fetchConcurrency: 10,
+  scoreConcurrency: 10,
   sources: {
     justjoinit: {
       enabled: true,

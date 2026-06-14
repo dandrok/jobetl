@@ -138,29 +138,36 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
 
       const url = normalizeUrl(href, baseUrl);
       const externalId = `${this.source}:${new URL(url).pathname}`;
-      const textNodes = extractLeafTexts($, element);
-      const titleIndex = textNodes.findIndex(
-        (value) => !isIgnorableText(value) && !isSalaryText(value)
-      );
-      const title = titleIndex >= 0 ? textNodes[titleIndex] : undefined;
+      const parent = $(element).parent();
+      const textNodes = extractLeafTexts($, parent);
+
+      const titleAttr = $(element).attr("title") || "";
+      const title = cheerio.load(titleAttr).text().replace(/^View offer\s+/i, "").trim() || undefined;
+
+      if (textNodes.length < 3 && !title) return;
 
       let salaryText: string | undefined;
       let company: string | undefined;
       let location: string | undefined;
 
-      for (const value of textNodes.slice(titleIndex + 1)) {
-        if (!salaryText && isSalaryText(value)) {
-          salaryText = /Undisclosed Salary/i.test(value) ? undefined : value;
+      for (let i = 0; i < textNodes.length; i++) {
+        const val = textNodes[i];
+
+        if (!salaryText && isSalaryText(val)) {
+          const combined = (i > 0 && /[\d\s,-]+/.test(textNodes[i-1])) ? textNodes[i-1] + " " + val : val;
+          if (!/Undisclosed/i.test(combined)) {
+            salaryText = combined;
+          }
           continue;
         }
 
-        if (!company && !isIgnorableText(value) && !isSalaryText(value)) {
-          company = value;
+        if (!company && !isIgnorableText(val) && val !== title && !isSalaryText(val) && !/^\d/.test(val)) {
+          company = val;
           continue;
         }
 
-        if (company && !location && !isIgnorableText(value) && !isSalaryText(value)) {
-          location = value;
+        if (company && !location && !isIgnorableText(val) && val !== title && val !== company && !isSalaryText(val) && !/^\d/.test(val)) {
+          location = val;
           break;
         }
       }
