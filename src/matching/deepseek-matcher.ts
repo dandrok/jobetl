@@ -11,6 +11,9 @@ const matchSchema = z.object({
   summary: z.string().min(1)
 });
 
+let activeScoreCalls = 0;
+let prevWarnings: any;
+
 export class DeepSeekMatcher {
   private readonly provider;
 
@@ -19,8 +22,11 @@ export class DeepSeekMatcher {
   }
 
   async scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult> {
-    const prevWarnings = (globalThis as any).AI_SDK_LOG_WARNINGS;
-    (globalThis as any).AI_SDK_LOG_WARNINGS = false;
+    if (activeScoreCalls === 0) {
+      prevWarnings = (globalThis as any).AI_SDK_LOG_WARNINGS;
+      (globalThis as any).AI_SDK_LOG_WARNINGS = false;
+    }
+    activeScoreCalls++;
     
     try {
       const result = await generateObject({
@@ -43,7 +49,10 @@ export class DeepSeekMatcher {
         shouldSave: true
       };
     } finally {
-      (globalThis as any).AI_SDK_LOG_WARNINGS = prevWarnings;
+      activeScoreCalls--;
+      if (activeScoreCalls === 0) {
+        (globalThis as any).AI_SDK_LOG_WARNINGS = prevWarnings;
+      }
     }
   }
 }
