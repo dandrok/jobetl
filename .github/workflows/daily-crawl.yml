@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup CV Markdown
+        run: echo "${{ secrets.CV_MARKDOWN }}" > cv.md
+
       - name: Hydrate SQLite from Notion
         run: npm run import:notion
 

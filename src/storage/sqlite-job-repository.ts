@@ -17,6 +17,7 @@ interface JobRow {
   match_reason: string | null;
   summary: string | null;
   status: string;
+  is_applied: number;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +36,7 @@ function mapRow(row: JobRow): StoredJob {
     matchReason: row.match_reason ?? undefined,
     summary: row.summary ?? undefined,
     status: row.status as StoredJob["status"],
+    isApplied: Boolean(row.is_applied),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -60,10 +62,17 @@ export class SQLiteJobRepository {
         match_reason TEXT,
         summary TEXT,
         status TEXT NOT NULL,
+        is_applied INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
     `);
+
+    const tableInfo = this.database.prepare("PRAGMA table_info(jobs)").all() as Array<{ name: string }>;
+    const hasIsApplied = tableInfo.some(col => col.name === 'is_applied');
+    if (!hasIsApplied) {
+      this.database.exec("ALTER TABLE jobs ADD COLUMN is_applied INTEGER NOT NULL DEFAULT 0;");
+    }
   }
 
   hasExternalId(externalId: string): boolean {
@@ -196,9 +205,10 @@ export class SQLiteJobRepository {
           match_reason,
           summary,
           status,
+          is_applied,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(external_id) DO UPDATE SET
           source = excluded.source,
           url = excluded.url,
@@ -211,6 +221,7 @@ export class SQLiteJobRepository {
           match_reason = excluded.match_reason,
           summary = excluded.summary,
           status = excluded.status,
+          is_applied = excluded.is_applied,
           created_at = excluded.created_at,
           updated_at = excluded.updated_at
       `)
@@ -227,9 +238,21 @@ export class SQLiteJobRepository {
         job.matchReason ?? null,
         job.summary ?? null,
         job.status,
+        job.isApplied ? 1 : 0,
         job.createdAt,
         job.updatedAt
       );
+  }
+
+  updateJobAppliedStatus(externalId: string, isApplied: boolean): void {
+    const now = new Date().toISOString();
+    this.database
+      .prepare(`
+        UPDATE jobs
+        SET is_applied = ?, updated_at = ?
+        WHERE external_id = ?
+      `)
+      .run(isApplied ? 1 : 0, now, externalId);
   }
 
   listJobs(): StoredJob[] {

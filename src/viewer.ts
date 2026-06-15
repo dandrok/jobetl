@@ -27,6 +27,30 @@ function startViewer() {
       res.writeHead(200, { "Content-Type": "application/json" });
       const jobs = repository.listJobs().filter(j => j.status === "matched" || j.status === "rejected");
       res.end(JSON.stringify(jobs));
+    } else if (req.url?.startsWith("/api/jobs/") && req.method === "PATCH") {
+      const match = req.url.match(/^\/api\/jobs\/([^/]+)$/);
+      if (match) {
+        const id = decodeURIComponent(match[1]);
+        let body = "";
+        req.on("data", chunk => body += chunk.toString());
+        req.on("end", () => {
+          try {
+            const data = JSON.parse(body);
+            if (typeof data.isApplied === "boolean") {
+              repository.updateJobAppliedStatus(id, data.isApplied);
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ success: true }));
+            } else {
+              res.writeHead(400); res.end("Bad Request");
+            }
+          } catch {
+            res.writeHead(400); res.end("Bad Request");
+          }
+        });
+        return;
+      }
+      res.writeHead(404);
+      res.end("Not found");
     } else {
       res.writeHead(404);
       res.end("Not found");

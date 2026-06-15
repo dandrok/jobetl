@@ -73,6 +73,7 @@ export interface StoredJob {
   matchReason?: string;
   summary?: string;
   status: JobStatus;
+  isApplied?: boolean;
   createdAt: string;
   updatedAt: string;
 }
