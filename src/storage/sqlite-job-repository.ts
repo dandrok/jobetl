@@ -17,6 +17,7 @@ interface JobRow {
   match_reason: string | null;
   summary: string | null;
   status: string;
+  is_applied: number;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +36,7 @@ function mapRow(row: JobRow): StoredJob {
     matchReason: row.match_reason ?? undefined,
     summary: row.summary ?? undefined,
     status: row.status as StoredJob["status"],
+    isApplied: Boolean(row.is_applied),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -60,10 +62,17 @@ export class SQLiteJobRepository {
         match_reason TEXT,
         summary TEXT,
         status TEXT NOT NULL,
+        is_applied INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
     `);
+
+    const tableInfo = this.database.prepare("PRAGMA table_info(jobs)").all() as Array<{ name: string }>;
+    const hasIsApplied = tableInfo.some(col => col.name === 'is_applied');
+    if (!hasIsApplied) {
+      this.database.exec("ALTER TABLE jobs ADD COLUMN is_applied INTEGER NOT NULL DEFAULT 0;");
+    }
   }
 
   hasExternalId(externalId: string): boolean {
@@ -181,55 +190,53 @@ export class SQLiteJobRepository {
   }
 
   upsertStoredJob(job: StoredJob): void {
-    this.database
+    const hasIsApplied = typeof job.isApplied === "boolean";
+    const sql = `
+      INSERT INTO jobs (
+        external_id, source, url, title, company, salary_text, location, offer_markdown, match_score, match_reason, summary, status, ${hasIsApplied ? "is_applied, " : ""}created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasIsApplied ? "?, " : ""}?, ?)
+      ON CONFLICT(external_id) DO UPDATE SET
+        source = excluded.source,
+        url = excluded.url,
+        title = excluded.title,
+        company = excluded.company,
+        salary_text = excluded.salary_text,
+        location = excluded.location,
+        offer_markdown = excluded.offer_markdown,
+        match_score = excluded.match_score,
+        match_reason = excluded.match_reason,
+        summary = excluded.summary,
+        status = excluded.status,
+        ${hasIsApplied ? "is_applied = excluded.is_applied," : ""}
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at
+    `;
+
+    const params = [
+      job.externalId, job.source, job.url, job.title, job.company,
+      job.salaryText ?? null, job.location ?? null, job.offerMarkdown ?? null,
+      job.matchScore ?? null, job.matchReason ?? null, job.summary ?? null, job.status
+    ];
+    
+    if (hasIsApplied) {
+      params.push(job.isApplied ? 1 : 0);
+    }
+    
+    params.push(job.createdAt, job.updatedAt);
+    this.database.prepare(sql).run(...params);
+  }
+
+  updateJobAppliedStatus(externalId: string, isApplied: boolean): boolean {
+    const now = new Date().toISOString();
+    const result = this.database
       .prepare(`
-        INSERT INTO jobs (
-          external_id,
-          source,
-          url,
-          title,
-          company,
-          salary_text,
-          location,
-          offer_markdown,
-          match_score,
-          match_reason,
-          summary,
-          status,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(external_id) DO UPDATE SET
-          source = excluded.source,
-          url = excluded.url,
-          title = excluded.title,
-          company = excluded.company,
-          salary_text = excluded.salary_text,
-          location = excluded.location,
-          offer_markdown = excluded.offer_markdown,
-          match_score = excluded.match_score,
-          match_reason = excluded.match_reason,
-          summary = excluded.summary,
-          status = excluded.status,
-          created_at = excluded.created_at,
-          updated_at = excluded.updated_at
+        UPDATE jobs
+        SET is_applied = ?, updated_at = ?
+        WHERE external_id = ?
       `)
-      .run(
-        job.externalId,
-        job.source,
-        job.url,
-        job.title,
-        job.company,
-        job.salaryText ?? null,
-        job.location ?? null,
-        job.offerMarkdown ?? null,
-        job.matchScore ?? null,
-        job.matchReason ?? null,
-        job.summary ?? null,
-        job.status,
-        job.createdAt,
-        job.updatedAt
-      );
+      .run(isApplied ? 1 : 0, now, externalId);
+    
+    return result.changes > 0;
   }
 
   listJobs(): StoredJob[] {

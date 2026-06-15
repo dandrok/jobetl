@@ -113,6 +113,15 @@ function readNumber(property: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
+function readCheckbox(property: unknown): boolean {
+  if (!property || typeof property !== "object") {
+    return false;
+  }
+
+  const value = (property as { checkbox?: unknown }).checkbox;
+  return typeof value === "boolean" ? value : false;
+}
+
 function dateOrRichTextProperty(
   kind: "date" | "rich_text" | undefined,
   value: string
@@ -212,6 +221,10 @@ export function buildNotionJobProperties(
     properties.Summary = richTextProperty(job.summary);
   }
 
+  if (schema.isAppliedKind) {
+    properties.Applied = { checkbox: job.isApplied ?? false };
+  }
+
   const createdAtProperty = dateOrRichTextProperty(schema.createdAtKind, job.createdAt);
   if (createdAtProperty) {
     properties["Created At"] = createdAtProperty;
@@ -262,6 +275,7 @@ export function mapNotionPageToStoredJob(
     matchScore: readNumber(page.properties["Match Score"]),
     matchReason: readRichTextPlainText(page.properties["Match Reason"]),
     summary: readRichTextPlainText(page.properties.Summary),
+    isApplied: schema.isAppliedKind ? readCheckbox(page.properties.Applied) : false,
     status,
     createdAt:
       readDateStart(page.properties["Created At"]) ??
