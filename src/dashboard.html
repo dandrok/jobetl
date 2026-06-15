@@ -899,16 +899,20 @@
       const appliedCheckbox = document.getElementById('drawApplied');
       appliedCheckbox.checked = job.isApplied === true;
       appliedCheckbox.onchange = async (e) => {
+        const priorState = job.isApplied;
         const isApplied = e.target.checked;
         job.isApplied = isApplied;
         try {
-          await fetch(`/api/jobs/${encodeURIComponent(job.externalId)}`, {
+          const res = await fetch(`/api/jobs/${encodeURIComponent(job.externalId)}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ isApplied })
           });
+          if (!res.ok) throw new Error(`Server returned ${res.status}`);
         } catch (err) {
           console.error("Failed to update applied status", err);
+          job.isApplied = priorState;
+          e.target.checked = priorState === true;
         }
       };
       

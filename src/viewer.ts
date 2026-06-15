@@ -30,16 +30,40 @@ function startViewer() {
     } else if (req.url?.startsWith("/api/jobs/") && req.method === "PATCH") {
       const match = req.url.match(/^\/api\/jobs\/([^/]+)$/);
       if (match) {
-        const id = decodeURIComponent(match[1]);
+        let id: string;
+        try {
+          id = decodeURIComponent(match[1]);
+        } catch {
+          res.writeHead(400);
+          res.end("Bad Request");
+          return;
+        }
+
         let body = "";
-        req.on("data", chunk => body += chunk.toString());
+        let tooLarge = false;
+        req.on("data", chunk => {
+          if (tooLarge) return;
+          body += chunk.toString();
+          if (body.length > 65536) {
+            tooLarge = true;
+            res.writeHead(413);
+            res.end("Payload Too Large");
+            req.destroy();
+          }
+        });
         req.on("end", () => {
+          if (tooLarge) return;
           try {
             const data = JSON.parse(body);
             if (typeof data.isApplied === "boolean") {
-              repository.updateJobAppliedStatus(id, data.isApplied);
-              res.writeHead(200, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ success: true }));
+              const updated = repository.updateJobAppliedStatus(id, data.isApplied);
+              if (updated) {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ success: true }));
+              } else {
+                res.writeHead(404);
+                res.end("Not found");
+              }
             } else {
               res.writeHead(400); res.end("Bad Request");
             }

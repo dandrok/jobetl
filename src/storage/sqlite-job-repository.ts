@@ -190,69 +190,53 @@ export class SQLiteJobRepository {
   }
 
   upsertStoredJob(job: StoredJob): void {
-    this.database
-      .prepare(`
-        INSERT INTO jobs (
-          external_id,
-          source,
-          url,
-          title,
-          company,
-          salary_text,
-          location,
-          offer_markdown,
-          match_score,
-          match_reason,
-          summary,
-          status,
-          is_applied,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(external_id) DO UPDATE SET
-          source = excluded.source,
-          url = excluded.url,
-          title = excluded.title,
-          company = excluded.company,
-          salary_text = excluded.salary_text,
-          location = excluded.location,
-          offer_markdown = excluded.offer_markdown,
-          match_score = excluded.match_score,
-          match_reason = excluded.match_reason,
-          summary = excluded.summary,
-          status = excluded.status,
-          is_applied = excluded.is_applied,
-          created_at = excluded.created_at,
-          updated_at = excluded.updated_at
-      `)
-      .run(
-        job.externalId,
-        job.source,
-        job.url,
-        job.title,
-        job.company,
-        job.salaryText ?? null,
-        job.location ?? null,
-        job.offerMarkdown ?? null,
-        job.matchScore ?? null,
-        job.matchReason ?? null,
-        job.summary ?? null,
-        job.status,
-        job.isApplied ? 1 : 0,
-        job.createdAt,
-        job.updatedAt
-      );
+    const hasIsApplied = typeof job.isApplied === "boolean";
+    const sql = `
+      INSERT INTO jobs (
+        external_id, source, url, title, company, salary_text, location, offer_markdown, match_score, match_reason, summary, status, ${hasIsApplied ? "is_applied, " : ""}created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasIsApplied ? "?, " : ""}?, ?)
+      ON CONFLICT(external_id) DO UPDATE SET
+        source = excluded.source,
+        url = excluded.url,
+        title = excluded.title,
+        company = excluded.company,
+        salary_text = excluded.salary_text,
+        location = excluded.location,
+        offer_markdown = excluded.offer_markdown,
+        match_score = excluded.match_score,
+        match_reason = excluded.match_reason,
+        summary = excluded.summary,
+        status = excluded.status,
+        ${hasIsApplied ? "is_applied = excluded.is_applied," : ""}
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at
+    `;
+
+    const params = [
+      job.externalId, job.source, job.url, job.title, job.company,
+      job.salaryText ?? null, job.location ?? null, job.offerMarkdown ?? null,
+      job.matchScore ?? null, job.matchReason ?? null, job.summary ?? null, job.status
+    ];
+    
+    if (hasIsApplied) {
+      params.push(job.isApplied ? 1 : 0);
+    }
+    
+    params.push(job.createdAt, job.updatedAt);
+    this.database.prepare(sql).run(...params);
   }
 
-  updateJobAppliedStatus(externalId: string, isApplied: boolean): void {
+  updateJobAppliedStatus(externalId: string, isApplied: boolean): boolean {
     const now = new Date().toISOString();
-    this.database
+    const result = this.database
       .prepare(`
         UPDATE jobs
         SET is_applied = ?, updated_at = ?
         WHERE external_id = ?
       `)
       .run(isApplied ? 1 : 0, now, externalId);
+    
+    return result.changes > 0;
   }
 
   listJobs(): StoredJob[] {
