@@ -948,6 +948,7 @@
         const priorState = job.isApplied;
         const isApplied = e.target.checked;
         job.isApplied = isApplied;
+        e.target.disabled = true;
         renderList();
         try {
           const res = await fetch(`/api/jobs/${encodeURIComponent(job.externalId)}`, {
@@ -961,6 +962,8 @@
           job.isApplied = priorState;
           e.target.checked = priorState === true;
           renderList();
+        } finally {
+          e.target.disabled = false;
         }
       };
       

@@ -96,7 +96,7 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
 
     for (let page = 1; offers.length < config.maxListings; page += 1) {
       const targetUrl = this.buildSearchUrl(config.filters, config.baseUrl, page);
-      const jinaUrl = `https://r.jina.ai/${targetUrl}`;
+      const jinaUrl = `https://r.jina.ai/${encodeURIComponent(targetUrl)}`;
 
       const html = await fetchHtml(jinaUrl, {
         headers: { "x-return-format": "html" }

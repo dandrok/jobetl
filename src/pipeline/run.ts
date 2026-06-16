@@ -42,7 +42,7 @@ export interface PipelineRepository {
 
 export interface PipelineDependencies {
   adapters: SourceAdapterMap;
-  fetchListingHtml(url: string): Promise<string>;
+  fetchListingHtml(url: string, init?: RequestInit): Promise<string>;
   loadResumeMarkdown(path: string): Promise<string>;
   fetchOfferMarkdown(url: string): Promise<string>;
   scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult>;

@@ -154,7 +154,7 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
         const val = textNodes[i];
 
         if (!salaryText && isSalaryText(val)) {
-          const combined = (i > 0 && /[\d\s,-]+/.test(textNodes[i-1])) ? textNodes[i-1] + " " + val : val;
+          const combined = (i > 0 && /^[\d\s,-]+$/.test(textNodes[i-1])) ? textNodes[i-1] + " " + val : val;
           if (!/Undisclosed/i.test(combined)) {
             salaryText = combined;
           }

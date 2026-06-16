@@ -79,7 +79,8 @@ describe("selectSources", () => {
     expect(selected.map((item) => item.source)).toEqual([
       "justjoinit",
       "nofluffjobs",
-      "bulldogjob"
+      "bulldogjob",
+      "pracujpl"
     ]);
   });
 
