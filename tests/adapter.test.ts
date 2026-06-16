@@ -53,43 +53,47 @@ describe("JustJoinItAdapter", () => {
   test("extracts clean fields from nested listing cards without copying whole card text", () => {
     const html = `
       <main>
-        <a href="/job-offer/accenture-node-js-developer-warszawa-javascript">
-          <div>
-            <div><span>Super offer</span></div>
-            <div><h3>Node.js Developer</h3></div>
-            <div><span>Undisclosed Salary</span></div>
-            <div><span>Undisclosed Salary</span></div>
-            <div><span>Accenture</span></div>
-            <div><span>Warszawa, +3Locations</span></div>
-            <div><span>22d left</span></div>
+        <div>
+          <a href="/job-offer/accenture-node-js-developer-warszawa-javascript" title="Node.js Developer">
             <div>
-              <span>AWS</span>
-              <span>TypeScript</span>
-              <span>Node.js</span>
+              <div><span>Super offer</span></div>
+              <div><h3>Node.js Developer</h3></div>
+              <div><span>Undisclosed Salary</span></div>
+              <div><span>Undisclosed Salary</span></div>
+              <div><span>Accenture</span></div>
+              <div><span>Warszawa, +3Locations</span></div>
+              <div><span>22d left</span></div>
+              <div>
+                <span>AWS</span>
+                <span>TypeScript</span>
+                <span>Node.js</span>
+              </div>
+              <div>
+                <span>AWS</span>
+                <span>TypeScript</span>
+                <span>Node.js</span>
+              </div>
             </div>
+          </a>
+        </div>
+        <div>
+          <a href="/job-offer/antal-sp-z-o-o--qa-automation-engineer-wroclaw-testing" title="QA Automation Engineer">
             <div>
-              <span>AWS</span>
-              <span>TypeScript</span>
-              <span>Node.js</span>
+              <div><h3>QA Automation Engineer</h3></div>
+              <div><span>23 500 - 26 800 PLN/month</span></div>
+              <div><span>23 500 - 26 800 PLN/month</span></div>
+              <div><span>Antal Sp. z o.o.</span></div>
+              <div><span>Wrocław</span></div>
+              <div><span>Remote</span></div>
+              <div><span>2d left</span></div>
+              <div>
+                <span>Redis</span>
+                <span>PostgreSQL</span>
+                <span>TypeScript</span>
+              </div>
             </div>
-          </div>
-        </a>
-        <a href="/job-offer/antal-sp-z-o-o--qa-automation-engineer-wroclaw-testing">
-          <div>
-            <div><h3>QA Automation Engineer</h3></div>
-            <div><span>23 500 - 26 800 PLN/month</span></div>
-            <div><span>23 500 - 26 800 PLN/month</span></div>
-            <div><span>Antal Sp. z o.o.</span></div>
-            <div><span>Wrocław</span></div>
-            <div><span>Remote</span></div>
-            <div><span>2d left</span></div>
-            <div>
-              <span>Redis</span>
-              <span>PostgreSQL</span>
-              <span>TypeScript</span>
-            </div>
-          </div>
-        </a>
+          </a>
+        </div>
       </main>
     `;
 

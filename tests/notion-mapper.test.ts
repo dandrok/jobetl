@@ -156,6 +156,7 @@ describe("buildNotionJobProperties", () => {
       matchReason: undefined,
       summary: undefined,
       status: "matched",
+      isApplied: false,
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-03T00:00:00.000Z"
     });

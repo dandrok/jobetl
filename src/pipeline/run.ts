@@ -42,7 +42,7 @@ export interface PipelineRepository {
 
 export interface PipelineDependencies {
   adapters: SourceAdapterMap;
-  fetchListingHtml(url: string): Promise<string>;
+  fetchListingHtml(url: string, init?: RequestInit): Promise<string>;
   loadResumeMarkdown(path: string): Promise<string>;
   fetchOfferMarkdown(url: string): Promise<string>;
   scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult>;
@@ -71,8 +71,8 @@ function createProgressSnapshot(): PipelineProgressSnapshot {
   };
 }
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url);
+async function fetchText(url: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(url, init);
   if (!response.ok) {
     throw new Error(`Request failed for ${url} with ${response.status}`);
   }
@@ -82,7 +82,7 @@ async function fetchText(url: string): Promise<string> {
 
 async function discoverSource(
   selectedSource: SelectedSource,
-  fetchHtml: (url: string) => Promise<string>
+  fetchHtml: (url: string, init?: RequestInit) => Promise<string>
 ): Promise<JobListing[]> {
   return selectedSource.adapter.discoverListings(selectedSource.config, fetchHtml);
 }

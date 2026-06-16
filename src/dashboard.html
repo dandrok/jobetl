@@ -384,6 +384,22 @@
 
     .job-row:last-child { border-bottom: none; }
     .job-row:hover { background: rgba(128,128,128,0.03); }
+    .job-row.applied { background: var(--accent-light); opacity: 0.85; }
+
+    .badge-applied {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--success);
+      border: 1px solid var(--success);
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
 
     .col-score { font-family: monospace; font-size: 0.95rem; color: var(--text-secondary); }
     .score-high { color: var(--success); font-weight: 600; }
@@ -582,9 +598,18 @@
         </button>
         <h1 id="mainTitle">Matched</h1>
       </div>
-      <div class="search-bar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="search" id="searchInput" placeholder="Search title or company..." aria-label="Search jobs">
+      <div style="display: flex; gap: 0.75rem; flex: 1; max-width: 480px;">
+        <div style="position: relative;">
+          <select id="sortSelect" aria-label="Sort options" style="height: 100%; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 0.6rem 2rem 0.6rem 1rem; border-radius: 8px; font-size: 0.95rem; outline: none; cursor: pointer; appearance: none;">
+            <option value="score">Sort by Score</option>
+            <option value="date">Sort by Latest</option>
+          </select>
+          <svg style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-tertiary);" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+        <div class="search-bar" style="flex: 1; max-width: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" id="searchInput" placeholder="Search title or company..." aria-label="Search jobs" style="height: 100%;">
+        </div>
       </div>
     </div>
 
@@ -691,6 +716,7 @@
     let allJobs = [];
     let selectedSources = new Set();
     let currentFilter = 'matched';
+    let currentSort = 'score';
     const thresholdPercent = Number('__MATCH_THRESHOLD__') || 78;
 
     function toggleSidebar() {
@@ -806,7 +832,11 @@
         return true;
       });
 
-      filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+      if (currentSort === 'date') {
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } else {
+        filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+      }
 
       if (filtered.length === 0) {
         container.innerHTML = '<div id="emptyState">No opportunities match this criteria.</div>';
@@ -818,7 +848,7 @@
         const scoreClass = score >= thresholdPercent ? 'score-high' : '';
         
         const row = document.createElement('button');
-        row.className = 'job-row';
+        row.className = 'job-row' + (job.isApplied ? ' applied' : '');
         row.setAttribute('role', 'listitem');
         row.onclick = () => openDrawer(job.externalId);
         
@@ -832,6 +862,12 @@
         const title = document.createElement('div');
         title.className = 'job-title';
         title.textContent = job.title;
+        if (job.isApplied) {
+          const badge = document.createElement('span');
+          badge.className = 'badge-applied';
+          badge.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Applied';
+          title.appendChild(badge);
+        }
         const company = document.createElement('div');
         company.className = 'job-company';
         company.textContent = job.company;
@@ -840,6 +876,16 @@
 
         const colMeta = document.createElement('div');
         colMeta.className = 'col-meta';
+        
+        const dateChip = document.createElement('div');
+        dateChip.className = 'meta-chip';
+        dateChip.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> `;
+        const dateSpan = document.createElement('span');
+        const d = new Date(job.createdAt);
+        dateSpan.textContent = isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        dateChip.appendChild(dateSpan);
+        colMeta.appendChild(dateChip);
+
         if (job.location) {
           const loc = document.createElement('div');
           loc.className = 'meta-chip';
@@ -902,6 +948,8 @@
         const priorState = job.isApplied;
         const isApplied = e.target.checked;
         job.isApplied = isApplied;
+        e.target.disabled = true;
+        renderList();
         try {
           const res = await fetch(`/api/jobs/${encodeURIComponent(job.externalId)}`, {
             method: 'PATCH',
@@ -913,6 +961,9 @@
           console.error("Failed to update applied status", err);
           job.isApplied = priorState;
           e.target.checked = priorState === true;
+          renderList();
+        } finally {
+          e.target.disabled = false;
         }
       };
       
@@ -938,6 +989,11 @@
     }
 
     document.getElementById('searchInput').addEventListener('input', renderList);
+    
+    document.getElementById('sortSelect').addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      renderList();
+    });
     
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {

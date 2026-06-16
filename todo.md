@@ -44,3 +44,18 @@ flowchart TD
         DB -->|Optional Backup Sync| NOTION[(Notion Dashboard)]
     end
 ```
+
+## Future Architectural Improvements
+
+### 1. Frontend Architecture: Componentization
+- [ ] **Migrate Dashboard:** The current `src/dashboard.html` is a fragile ~1,000-line monolith relying on manual DOM manipulation. Migrate to a modern build system (e.g., Vite + Preact or Svelte) to enforce strict component boundaries, reactive state management, and easier styling maintenance.
+
+### 2. Scraper Resilience & Telemetry
+- [ ] **Data Validation Layer:** Implement **Zod** schemas at the scraper boundary. If structural changes occur on external portals (e.g., class name changes on `justjoin.it`), the pipeline should throw structured errors instead of silently failing or persisting corrupted data.
+- [ ] **Failure Telemetry:** Add webhook alerts (Discord/Slack) triggered by extraction failure rate spikes to self-monitor scraper health.
+
+### 3. Database Layer: Formal Schema Migrations
+- [ ] **Introduce an ORM:** Raw `PRAGMA` checks for schema modifications are an unsustainable stopgap. Integrate a type-safe Query Builder/ORM like **Drizzle ORM** or **Kysely**. This ensures that the TypeScript `StoredJob` types map perfectly to the database schema and enables automated, trackable database migrations.
+
+### 4. LLM Scoring: Contextual RAG
+- [ ] **Dynamic Embedding Retrieval:** `DeepSeekMatcher` currently scores against a static Markdown CV zero-shot. Implement **RAG (Retrieval-Augmented Generation)** using an embedded vector database (like Chroma or SQLite `vss`). By injecting past binary decisions (`isApplied: true/false`) into the LLM context, the model will dynamically learn implicit preferences, drastically improving signal-to-noise ratio.

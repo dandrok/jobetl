@@ -77,6 +77,14 @@ function createConfig(): RunConfig {
           keyword: "JavaScript"
         },
         maxListings: 10
+      },
+      pracujpl: {
+        enabled: true,
+        baseUrl: "https://it.pracuj.pl",
+        filters: {
+          keyword: "node"
+        },
+        maxListings: 10
       }
     }
   };
@@ -88,13 +96,17 @@ function createListing(id: string, source: JobSource = "justjoinit"): JobListing
       ? `/job-offer/${id}`
       : source === "nofluffjobs"
         ? `/pl/job/${id}`
-        : `/companies/jobs/${id}`;
+        : source === "pracujpl"
+          ? `/praca/${id},oferta,123`
+          : `/companies/jobs/${id}`;
   const url =
     source === "justjoinit"
       ? `https://justjoin.it${path}`
       : source === "nofluffjobs"
         ? `https://nofluffjobs.com${path}`
-        : `https://bulldogjob.com${path}`;
+        : source === "pracujpl"
+          ? `https://it.pracuj.pl${path}`
+          : `https://bulldogjob.com${path}`;
 
   return {
     externalId: `${source}:${path}`,
@@ -235,6 +247,10 @@ function createAdapters(
     bulldogjob: {
       source: "bulldogjob",
       discoverListings: vi.fn(async () => listingsBySource.bulldogjob ?? [])
+    },
+    pracujpl: {
+      source: "pracujpl",
+      discoverListings: vi.fn(async () => listingsBySource.pracujpl ?? [])
     }
   };
 }
@@ -370,6 +386,31 @@ describe("runPipeline", () => {
     expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
     expect(adapters.nofluffjobs.discoverListings).not.toHaveBeenCalled();
     expect(adapters.bulldogjob.discoverListings).toHaveBeenCalledTimes(1);
+  });
+
+  test("runs only pracujpl discovery when the pracujpl source filter is selected", async () => {
+    const config = createConfig();
+    const repository = createRepository();
+    const adapters = createAdapters({
+      pracujpl: [createListing("pracuj-1", "pracujpl")],
+      justjoinit: [createListing("jji-1", "justjoinit")],
+      nofluffjobs: [createListing("nfj-1", "nofluffjobs")],
+      bulldogjob: [createListing("bdj-1", "bulldogjob")]
+    });
+    const dependencies = createDependencies(repository, adapters);
+
+    const summary = await runPipeline(
+      config,
+      undefined,
+      dependencies,
+      { source: "pracujpl" }
+    );
+
+    expect(summary.scanned).toBe(1);
+    expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
+    expect(adapters.nofluffjobs.discoverListings).not.toHaveBeenCalled();
+    expect(adapters.bulldogjob.discoverListings).not.toHaveBeenCalled();
+    expect(adapters.pracujpl.discoverListings).toHaveBeenCalledTimes(1);
   });
 
   test("skips jobs already finalized as matched or rejected after upserting them", async () => {
