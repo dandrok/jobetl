@@ -4,7 +4,7 @@ export interface SourceAdapter<T extends JobSource = JobSource> {
   readonly source: T;
   discoverListings(
     config: SourceConfigFor<T>,
-    fetchHtml: (url: string) => Promise<string>
+    fetchHtml: (url: string, init?: RequestInit) => Promise<string>
   ): Promise<JobListing[]>;
 }
 

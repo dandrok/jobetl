@@ -1,4 +1,4 @@
-export const JOB_SOURCES = ["justjoinit", "nofluffjobs", "bulldogjob"] as const;
+export const JOB_SOURCES = ["justjoinit", "nofluffjobs", "bulldogjob", "pracujpl"] as const;
 
 export type JobSource = (typeof JOB_SOURCES)[number];
 
@@ -98,6 +98,11 @@ export interface BulldogjobSearchFilters {
   keyword?: string;
 }
 
+export interface PracujPlSearchFilters {
+  keyword?: string;
+  location?: string;
+}
+
 export type SearchFilters = JustJoinItSearchFilters;
 
 export interface SourceConfig<TFilters = SearchFilters> {
@@ -111,6 +116,7 @@ export interface SourceConfigMap {
   justjoinit: SourceConfig<JustJoinItSearchFilters>;
   nofluffjobs: SourceConfig<NoFluffJobsSearchFilters>;
   bulldogjob: SourceConfig<BulldogjobSearchFilters>;
+  pracujpl: SourceConfig<PracujPlSearchFilters>;
 }
 
 export type SourceConfigFor<T extends JobSource> = SourceConfigMap[T];

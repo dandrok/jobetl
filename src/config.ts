@@ -31,6 +31,14 @@ export const config: RunConfig = {
       filters: {
         keyword: "JavaScript"
       }
+    },
+    pracujpl: {
+      enabled: true,
+      baseUrl: "https://it.pracuj.pl",
+      maxListings: 200,
+      filters: {
+        keyword: "javascript"
+      }
     }
   }
 };

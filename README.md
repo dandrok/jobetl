@@ -16,7 +16,7 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 ## Stack
 
 - Runtime: Node.js + TypeScript
-- Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`
+- Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`
 - Full-offer extraction: Jina Reader
 - AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
 - Storage: local SQLite (`./data/jobetl.db`)
@@ -116,12 +116,19 @@ Run a single source:
 npm run dev -- --source justjoinit
 npm run dev -- --source nofluffjobs
 npm run dev -- --source bulldogjob
+npm run dev -- --source pracujpl
 ```
 
-Review the best saved matches:
+Review the best saved matches in the terminal:
 
 ```bash
 npm run report
+```
+
+Launch the interactive local Web Dashboard (includes filtering, sorting, and CV sent tracking):
+
+```bash
+npm run dashboard
 ```
 
 Optional Notion sync commands:

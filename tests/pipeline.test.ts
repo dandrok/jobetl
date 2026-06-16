@@ -77,6 +77,14 @@ function createConfig(): RunConfig {
           keyword: "JavaScript"
         },
         maxListings: 10
+      },
+      pracujpl: {
+        enabled: true,
+        baseUrl: "https://it.pracuj.pl",
+        filters: {
+          keyword: "node"
+        },
+        maxListings: 10
       }
     }
   };
@@ -235,6 +243,10 @@ function createAdapters(
     bulldogjob: {
       source: "bulldogjob",
       discoverListings: vi.fn(async () => listingsBySource.bulldogjob ?? [])
+    },
+    pracujpl: {
+      source: "pracujpl",
+      discoverListings: vi.fn(async () => listingsBySource.pracujpl ?? [])
     }
   };
 }

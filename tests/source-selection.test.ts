@@ -38,6 +38,14 @@ function createConfig(): RunConfig {
         filters: {
           keyword: "JavaScript"
         }
+      },
+      pracujpl: {
+        enabled: true,
+        baseUrl: "https://it.pracuj.pl",
+        maxListings: 10,
+        filters: {
+          keyword: "javascript"
+        }
       }
     }
   };
@@ -55,6 +63,10 @@ function createAdapters(): SourceAdapterMap {
     },
     bulldogjob: {
       source: "bulldogjob",
+      discoverListings: async () => []
+    },
+    pracujpl: {
+      source: "pracujpl",
       discoverListings: async () => []
     }
   };
