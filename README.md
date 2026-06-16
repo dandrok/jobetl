@@ -140,20 +140,23 @@ npm run sync:notion
 
 ## GitHub Actions
 
-The repo includes [`daily-crawl.yml`](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml).
+The repo includes two core workflows:
 
-- Trigger: daily schedule plus manual `workflow_dispatch`
-- Secrets: `JINA_API_KEY`, `DEEPSEEK_API_KEY`, `NOTION_TOKEN`, `NOTION_DATABASE_ID`
-- Workflow order:
-  1. `npm run import:notion`
-  2. `npm run dev`
-  3. `npm run sync:notion`
+1. [`daily-crawl.yml`](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml): Production ETL cron job.
+   - Trigger: daily schedule plus manual `workflow_dispatch`
+   - Secrets: `JINA_API_KEY`, `DEEPSEEK_API_KEY`, `NOTION_TOKEN`, `NOTION_DATABASE_ID`
+   - Expectations: Expects Notion to be configured since it rebuilds local SQLite state from Notion before crawling.
+2. [`ci.yml`](/home/dandrok/git/jobetl/.github/workflows/ci.yml): Continuous Integration.
+   - Trigger: `push` and `pull_request` to `master`.
+   - Pipeline: Enforces Prettier formatting, ESLint rules, TypeScript compilation, and Vitest suite execution.
 
-The current workflow expects Notion to be configured, because GitHub runners start with an empty filesystem and rebuild local SQLite state from Notion before crawling.
+## Verify & Format
 
-## Verify
+Before pushing changes, ensure your code passes the CI checks locally:
 
 ```bash
+npm run format
+npm run lint
 npm test
 npm run build
 ```
