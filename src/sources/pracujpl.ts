@@ -1,10 +1,6 @@
 import * as cheerio from "cheerio";
 
-import type {
-  JobListing,
-  PracujPlSearchFilters,
-  SourceConfig
-} from "../types.js";
+import type { JobListing, PracujPlSearchFilters, SourceConfig } from "../types.js";
 import type { SourceAdapter } from "./types.js";
 
 function cleanText(value?: string): string | undefined {
@@ -19,11 +15,7 @@ function slugify(value: string): string {
 export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
   readonly source = "pracujpl" as const;
 
-  buildSearchUrl(
-    filters: PracujPlSearchFilters,
-    baseUrl: string,
-    page = 1
-  ): string {
+  buildSearchUrl(filters: PracujPlSearchFilters, baseUrl: string, page = 1): string {
     const segments = ["/praca"];
 
     if (filters.keyword) {
@@ -63,8 +55,11 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
       const company = cleanText(wrapper.find("h3, h4").first().text());
       const location = cleanText(wrapper.find("h4, h5").last().text());
 
-      const spans = wrapper.find("span").map((__, el) => $(el).text()).get();
-      const salaryTextRaw = spans.find(text => /PLN|zł/i.test(text) && /\d/.test(text));
+      const spans = wrapper
+        .find("span")
+        .map((__, el) => $(el).text())
+        .get();
+      const salaryTextRaw = spans.find((text) => /PLN|zł/i.test(text) && /\d/.test(text));
       const salaryText = cleanText(salaryTextRaw);
 
       if (!title || !company) return;
@@ -108,7 +103,7 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
       }
 
       offers.push(...pageOffers);
-      
+
       // Stop if there are no more pages
       if (pageOffers.length < 10) {
         break;

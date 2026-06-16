@@ -20,9 +20,7 @@ describe("parseCliOptions", () => {
   });
 
   test("throws when --source is missing its value", () => {
-    expect(() => parseCliOptions(["--source"])).toThrow(
-      "Missing value for --source"
-    );
+    expect(() => parseCliOptions(["--source"])).toThrow("Missing value for --source");
   });
 
   test("throws when --source receives an unsupported source name", () => {

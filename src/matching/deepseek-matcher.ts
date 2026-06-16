@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import type { JobOffer, MatchResult } from "../types.js";
 
-
 const matchSchema = z.object({
   score: z.number().min(0).max(1),
   reason: z.string().min(1),
@@ -27,7 +26,7 @@ export class DeepSeekMatcher {
       (globalThis as any).AI_SDK_LOG_WARNINGS = false;
     }
     activeScoreCalls++;
-    
+
     try {
       const result = await generateObject({
         model: this.provider("deepseek-v4-flash"),

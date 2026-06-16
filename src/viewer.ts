@@ -10,7 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 let DASHBOARD_HTML = "";
 try {
   const rawHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
-  DASHBOARD_HTML = rawHtml.replace(/__MATCH_THRESHOLD__/g, String(Math.round(config.matchThreshold * 100)));
+  DASHBOARD_HTML = rawHtml.replace(
+    /__MATCH_THRESHOLD__/g,
+    String(Math.round(config.matchThreshold * 100))
+  );
 } catch (e) {
   console.error("Failed to load dashboard.html:", e);
   process.exit(1);
@@ -25,7 +28,9 @@ function startViewer() {
       res.end(DASHBOARD_HTML);
     } else if (req.url === "/api/jobs") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      const jobs = repository.listJobs().filter(j => j.status === "matched" || j.status === "rejected");
+      const jobs = repository
+        .listJobs()
+        .filter((j) => j.status === "matched" || j.status === "rejected");
       res.end(JSON.stringify(jobs));
     } else if (req.url?.startsWith("/api/jobs/") && req.method === "PATCH") {
       const match = req.url.match(/^\/api\/jobs\/([^/]+)$/);
@@ -41,7 +46,7 @@ function startViewer() {
 
         let body = "";
         let tooLarge = false;
-        req.on("data", chunk => {
+        req.on("data", (chunk) => {
           if (tooLarge) return;
           body += chunk.toString();
           if (body.length > 65536) {
@@ -65,10 +70,12 @@ function startViewer() {
                 res.end("Not found");
               }
             } else {
-              res.writeHead(400); res.end("Bad Request");
+              res.writeHead(400);
+              res.end("Bad Request");
             }
           } catch {
-            res.writeHead(400); res.end("Bad Request");
+            res.writeHead(400);
+            res.end("Bad Request");
           }
         });
         return;

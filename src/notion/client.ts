@@ -86,9 +86,7 @@ function readRichTextPlainText(property: unknown): string | undefined {
 
   return value
     .map((item) =>
-      item && typeof item === "object" && "plain_text" in item
-        ? String(item.plain_text)
-        : ""
+      item && typeof item === "object" && "plain_text" in item ? String(item.plain_text) : ""
     )
     .join("");
 }
@@ -173,7 +171,7 @@ export class NotionDatabaseClient implements NotionSyncClient {
         lastEditedTime: page.last_edited_time ?? "",
         properties: page.properties
       })),
-      nextCursor: response.has_more ? response.next_cursor ?? undefined : undefined
+      nextCursor: response.has_more ? (response.next_cursor ?? undefined) : undefined
     };
   }
 
@@ -226,9 +224,7 @@ export class NotionDatabaseClient implements NotionSyncClient {
         continue;
       }
 
-      throw new Error(
-        `Notion request failed (${response.status} ${response.statusText}): ${body}`
-      );
+      throw new Error(`Notion request failed (${response.status} ${response.statusText}): ${body}`);
     }
 
     throw new Error("Notion request failed after exhausting retries.");

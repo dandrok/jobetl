@@ -1,10 +1,6 @@
 import * as cheerio from "cheerio";
 
-import type {
-  JobListing,
-  JustJoinItSearchFilters,
-  SourceConfig
-} from "../types.js";
+import type { JobListing, JustJoinItSearchFilters, SourceConfig } from "../types.js";
 import type { SourceAdapter } from "./types.js";
 
 const JUSTJOINIT_ROOT = "https://justjoin.it";
@@ -53,10 +49,7 @@ function isIgnorableText(value: string): boolean {
   return LEAD_BADGES.has(value) || META_TEXTS.has(value) || isTimeText(value);
 }
 
-function extractLeafTexts(
-  $: cheerio.CheerioAPI,
-  element: unknown
-): string[] {
+function extractLeafTexts($: cheerio.CheerioAPI, element: unknown): string[] {
   const texts = $(element as any)
     .find("*")
     .map((__, child) => {
@@ -81,10 +74,7 @@ function extractLeafTexts(
 export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
   readonly source = "justjoinit" as const;
 
-  buildSearchUrl(
-    filters: JustJoinItSearchFilters,
-    baseUrl = JUSTJOINIT_ROOT
-  ): string {
+  buildSearchUrl(filters: JustJoinItSearchFilters, baseUrl = JUSTJOINIT_ROOT): string {
     const url = new URL("/job-offers/all-locations", baseUrl);
 
     if (filters.keyword) {
@@ -119,9 +109,7 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
     config: SourceConfig<JustJoinItSearchFilters>,
     fetchHtml: (url: string) => Promise<string>
   ): Promise<JobListing[]> {
-    const html = await fetchHtml(
-      this.buildSearchUrl(config.filters, config.baseUrl)
-    );
+    const html = await fetchHtml(this.buildSearchUrl(config.filters, config.baseUrl));
 
     return this.parseListings(html, config.baseUrl).slice(0, config.maxListings);
   }
@@ -130,7 +118,7 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
     const $ = cheerio.load(html);
     const offers = new Map<string, JobListing>();
 
-    $("a[href*=\"/job-offer/\"]").each((_, element) => {
+    $('a[href*="/job-offer/"]').each((_, element) => {
       const href = $(element).attr("href");
       if (!href) {
         return;
@@ -142,7 +130,12 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
       const textNodes = extractLeafTexts($, parent);
 
       const titleAttr = $(element).attr("title") || "";
-      const title = cheerio.load(titleAttr).text().replace(/^View offer\s+/i, "").trim() || undefined;
+      const title =
+        cheerio
+          .load(titleAttr)
+          .text()
+          .replace(/^View offer\s+/i, "")
+          .trim() || undefined;
 
       if (textNodes.length < 3 && !title) return;
 
@@ -154,19 +147,34 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
         const val = textNodes[i];
 
         if (!salaryText && isSalaryText(val)) {
-          const combined = (i > 0 && /^[\d\s,-]+$/.test(textNodes[i-1])) ? textNodes[i-1] + " " + val : val;
+          const combined =
+            i > 0 && /^[\d\s,-]+$/.test(textNodes[i - 1]) ? textNodes[i - 1] + " " + val : val;
           if (!/Undisclosed/i.test(combined)) {
             salaryText = combined;
           }
           continue;
         }
 
-        if (!company && !isIgnorableText(val) && val !== title && !isSalaryText(val) && !/^\d/.test(val)) {
+        if (
+          !company &&
+          !isIgnorableText(val) &&
+          val !== title &&
+          !isSalaryText(val) &&
+          !/^\d/.test(val)
+        ) {
           company = val;
           continue;
         }
 
-        if (company && !location && !isIgnorableText(val) && val !== title && val !== company && !isSalaryText(val) && !/^\d/.test(val)) {
+        if (
+          company &&
+          !location &&
+          !isIgnorableText(val) &&
+          val !== title &&
+          val !== company &&
+          !isSalaryText(val) &&
+          !/^\d/.test(val)
+        ) {
           location = val;
           break;
         }

@@ -85,11 +85,7 @@ describe("selectSources", () => {
   });
 
   test("returns only the requested enabled source when a filter is provided", () => {
-    const selected = selectSources(
-      createConfig(),
-      createAdapters(),
-      "nofluffjobs"
-    );
+    const selected = selectSources(createConfig(), createAdapters(), "nofluffjobs");
 
     expect(selected.map((item) => item.source)).toEqual(["nofluffjobs"]);
   });
@@ -98,8 +94,8 @@ describe("selectSources", () => {
     const config = createConfig();
     config.sources.nofluffjobs.enabled = false;
 
-    expect(() =>
-      selectSources(config, createAdapters(), "nofluffjobs")
-    ).toThrow('Source "nofluffjobs" is disabled in config');
+    expect(() => selectSources(config, createAdapters(), "nofluffjobs")).toThrow(
+      'Source "nofluffjobs" is disabled in config'
+    );
   });
 });

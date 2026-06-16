@@ -1,10 +1,6 @@
 import * as cheerio from "cheerio";
 
-import type {
-  JobListing,
-  NoFluffJobsSearchFilters,
-  SourceConfig
-} from "../types.js";
+import type { JobListing, NoFluffJobsSearchFilters, SourceConfig } from "../types.js";
 import type { SourceAdapter } from "./types.js";
 
 function cleanText(value?: string): string | undefined {
@@ -21,10 +17,7 @@ function normalizeSalaryText(value: string): string {
 }
 
 function isSalaryText(value: string): boolean {
-  return (
-    /\b\d[\d\s]*(?:-|–)\s*\d[\d\s]*\s+PLN\b/.test(value) ||
-    /\b\d[\d\s]*\s+PLN\b/.test(value)
-  );
+  return /\b\d[\d\s]*(?:-|–)\s*\d[\d\s]*\s+PLN\b/.test(value) || /\b\d[\d\s]*\s+PLN\b/.test(value);
 }
 
 function normalizeLocation(value: string | undefined): string | undefined {
@@ -35,11 +28,7 @@ function normalizeLocation(value: string | undefined): string | undefined {
 export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
   readonly source = "nofluffjobs" as const;
 
-  buildSearchUrl(
-    filters: NoFluffJobsSearchFilters,
-    baseUrl: string,
-    page = 1
-  ): string {
+  buildSearchUrl(filters: NoFluffJobsSearchFilters, baseUrl: string, page = 1): string {
     const segments = ["/pl"];
 
     if (filters.location) {
@@ -64,10 +53,7 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
 
     $('a[href^="/pl/job/"]').each((_, element) => {
       const href = $(element).attr("href");
-      const title = cleanText($(element).find("h3").first().text())?.replace(
-        /\s+NOWA$/u,
-        ""
-      );
+      const title = cleanText($(element).find("h3").first().text())?.replace(/\s+NOWA$/u, "");
       const company = cleanText($(element).find("h4").first().text());
       const salaryText = $(element)
         .find("div, span")
@@ -76,12 +62,7 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
         .find((value): value is string => Boolean(value) && isSalaryText(value));
 
       const location = normalizeLocation(
-        $(element)
-          .find("h4")
-          .first()
-          .nextAll("div, span")
-          .first()
-          .text()
+        $(element).find("h4").first().nextAll("div, span").first().text()
       );
 
       if (!href || !title || !company) {

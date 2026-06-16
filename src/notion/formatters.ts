@@ -1,8 +1,6 @@
 import type { NotionSyncProgressSnapshot } from "./sync.js";
 
-export function formatNotionSyncProgressText(
-  snapshot: NotionSyncProgressSnapshot
-): string {
+export function formatNotionSyncProgressText(snapshot: NotionSyncProgressSnapshot): string {
   return [
     "syncing",
     `processed ${snapshot.processed}/${snapshot.total}`,

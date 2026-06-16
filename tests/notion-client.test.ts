@@ -74,9 +74,7 @@ describe("NotionDatabaseClient", () => {
       notionDatabaseId: "database-id"
     });
 
-    await expect(
-      client.findExistingJob("justjoinit:/job-offer/acme")
-    ).resolves.toEqual({
+    await expect(client.findExistingJob("justjoinit:/job-offer/acme")).resolves.toEqual({
       pageId: "page-1",
       syncedUpdatedAt: "2024-01-02T00:00:00.000Z"
     });

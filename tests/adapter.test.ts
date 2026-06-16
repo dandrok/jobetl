@@ -119,14 +119,8 @@ describe("JustJoinItAdapter", () => {
 
 describe("NoFluffJobsAdapter", () => {
   test("discovers listings across paginated pages", async () => {
-    const page1 = readFileSync(
-      "tests/fixtures/nofluffjobs-listing-page1.html",
-      "utf8"
-    );
-    const page2 = readFileSync(
-      "tests/fixtures/nofluffjobs-listing-page2.html",
-      "utf8"
-    );
+    const page1 = readFileSync("tests/fixtures/nofluffjobs-listing-page1.html", "utf8");
+    const page2 = readFileSync("tests/fixtures/nofluffjobs-listing-page2.html", "utf8");
     const adapter = new NoFluffJobsAdapter();
     const fetchHtml = vi.fn(async (url: string) => {
       if (url === "https://nofluffjobs.com/pl/warszawa/javascript") {
@@ -179,14 +173,8 @@ describe("NoFluffJobsAdapter", () => {
 
 describe("BulldogjobAdapter", () => {
   test("discovers listings across classic paginated pages", async () => {
-    const page1 = readFileSync(
-      "tests/fixtures/bulldogjob-listing-page1.html",
-      "utf8"
-    );
-    const page2 = readFileSync(
-      "tests/fixtures/bulldogjob-listing-page2.html",
-      "utf8"
-    );
+    const page1 = readFileSync("tests/fixtures/bulldogjob-listing-page1.html", "utf8");
+    const page2 = readFileSync("tests/fixtures/bulldogjob-listing-page2.html", "utf8");
     const adapter = new BulldogjobAdapter();
     const fetchHtml = vi.fn(async (url: string) => {
       if (url === "https://bulldogjob.com/companies/jobs/s/skills,JavaScript") {
@@ -227,8 +215,7 @@ describe("BulldogjobAdapter", () => {
       location: "Warsaw"
     });
     expect(offers[2]).toMatchObject({
-      externalId:
-        "bulldogjob:/companies/jobs/236466-senior-frontend-engineer-madrid-aircall",
+      externalId: "bulldogjob:/companies/jobs/236466-senior-frontend-engineer-madrid-aircall",
       company: "Aircall",
       location: "Madrid"
     });

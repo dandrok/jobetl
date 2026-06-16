@@ -28,9 +28,7 @@ function requirePropertyType(
   }
 
   if (!supportedTypes.includes(property.type)) {
-    throw new Error(
-      `Notion property "${name}" must use one of: ${supportedTypes.join(", ")}`
-    );
+    throw new Error(`Notion property "${name}" must use one of: ${supportedTypes.join(", ")}`);
   }
 
   return property.type;
@@ -64,27 +62,16 @@ export function buildNotionJobDatabaseSchema(
   requirePropertyType(database, "URL", ["url"]);
 
   const statusKind = requirePropertyType(database, "Status", ["status", "select"]);
-  const sourceKind = readOptionalPropertyType(database, "Source", [
-    "select",
-    "rich_text"
-  ]);
+  const sourceKind = readOptionalPropertyType(database, "Source", ["select", "rich_text"]);
   const companyKind = readOptionalPropertyType(database, "Company", ["rich_text"]);
   const salaryKind = readOptionalPropertyType(database, "Salary", ["rich_text"]);
   const locationKind = readOptionalPropertyType(database, "Location", ["rich_text"]);
   const matchScoreKind = readOptionalPropertyType(database, "Match Score", ["number"]);
-  const matchReasonKind = readOptionalPropertyType(database, "Match Reason", [
-    "rich_text"
-  ]);
+  const matchReasonKind = readOptionalPropertyType(database, "Match Reason", ["rich_text"]);
   const summaryKind = readOptionalPropertyType(database, "Summary", ["rich_text"]);
   const isAppliedKind = readOptionalPropertyType(database, "Applied", ["checkbox"]);
-  const createdAtKind = readOptionalPropertyType(database, "Created At", [
-    "date",
-    "rich_text"
-  ]);
-  const updatedAtKind = readOptionalPropertyType(database, "Updated At", [
-    "date",
-    "rich_text"
-  ]);
+  const createdAtKind = readOptionalPropertyType(database, "Created At", ["date", "rich_text"]);
+  const updatedAtKind = readOptionalPropertyType(database, "Updated At", ["date", "rich_text"]);
 
   return {
     statusKind: statusKind as NotionJobDatabaseSchema["statusKind"],

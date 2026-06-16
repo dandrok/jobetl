@@ -38,15 +38,11 @@ describe("progress formatters", () => {
   });
 
   test("derives mixed stage when both worker types are active", () => {
-    expect(
-      derivePipelineStage(createSnapshot())
-    ).toBe("mixed");
+    expect(derivePipelineStage(createSnapshot())).toBe("mixed");
   });
 
   test("formats the pipeline progress line", () => {
-    expect(
-      formatPipelineProgressText(createSnapshot())
-    ).toBe(
+    expect(formatPipelineProgressText(createSnapshot())).toBe(
       "stage: mixed | discovered 42 | skipped 30 | queued-fetch 8 | fetching 4 | queued-score 3 | scoring 2 | matched 5 | rejected 2 | failed 1 | current: fetching Acme, scoring BetaSoft"
     );
   });
@@ -120,9 +116,7 @@ describe("progress formatters", () => {
       default: ora
     }));
 
-    const { OraProgressReporter } = await import(
-      "../src/progress/ora-progress-reporter.js"
-    );
+    const { OraProgressReporter } = await import("../src/progress/ora-progress-reporter.js");
 
     const reporter = new OraProgressReporter();
     const startSnapshot = createSnapshot({

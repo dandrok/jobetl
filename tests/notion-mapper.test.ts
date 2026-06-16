@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  buildNotionJobProperties,
-  mapNotionPageToStoredJob
-} from "../src/notion/mapper.js";
+import { buildNotionJobProperties, mapNotionPageToStoredJob } from "../src/notion/mapper.js";
 import type { StoredJob } from "../src/types.js";
 
 const job: StoredJob = {

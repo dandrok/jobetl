@@ -4,9 +4,7 @@ export function formatRunStartText(totalListings: number): string {
   return `Found ${totalListings} listings to process`;
 }
 
-export function derivePipelineStage(
-  snapshot: PipelineProgressSnapshot
-): PipelineStage {
+export function derivePipelineStage(snapshot: PipelineProgressSnapshot): PipelineStage {
   if (snapshot.stage === "done") {
     return "done";
   }
@@ -33,9 +31,7 @@ export function derivePipelineStage(
   return snapshot.stage;
 }
 
-export function formatPipelineProgressText(
-  snapshot: PipelineProgressSnapshot
-): string {
+export function formatPipelineProgressText(snapshot: PipelineProgressSnapshot): string {
   const stage = derivePipelineStage(snapshot);
   const parts = [
     `stage: ${stage}`,

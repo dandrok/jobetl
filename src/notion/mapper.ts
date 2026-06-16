@@ -51,9 +51,7 @@ function readTitlePlainText(property: unknown): string | undefined {
 
   return value
     .map((item) =>
-      item && typeof item === "object" && "plain_text" in item
-        ? String(item.plain_text)
-        : ""
+      item && typeof item === "object" && "plain_text" in item ? String(item.plain_text) : ""
     )
     .join("");
 }
@@ -70,9 +68,7 @@ function readRichTextPlainText(property: unknown): string | undefined {
 
   return value
     .map((item) =>
-      item && typeof item === "object" && "plain_text" in item
-        ? String(item.plain_text)
-        : ""
+      item && typeof item === "object" && "plain_text" in item ? String(item.plain_text) : ""
     )
     .join("");
 }
@@ -156,9 +152,7 @@ function readDateStart(property: unknown): string | undefined {
 
 function inferSource(externalId: string): JobSource | undefined {
   const prefix = externalId.split(":")[0];
-  return JOB_SOURCES.includes(prefix as JobSource)
-    ? (prefix as JobSource)
-    : undefined;
+  return JOB_SOURCES.includes(prefix as JobSource) ? (prefix as JobSource) : undefined;
 }
 
 function normalizeSource(value: string | undefined): JobSource | undefined {
@@ -166,9 +160,7 @@ function normalizeSource(value: string | undefined): JobSource | undefined {
 }
 
 function normalizeStatus(value: string | undefined): JobStatus | undefined {
-  return JOB_STATUSES.includes(value as JobStatus)
-    ? (value as JobStatus)
-    : undefined;
+  return JOB_STATUSES.includes(value as JobStatus) ? (value as JobStatus) : undefined;
 }
 
 export function buildNotionJobProperties(

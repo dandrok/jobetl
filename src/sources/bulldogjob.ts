@@ -1,10 +1,6 @@
 import * as cheerio from "cheerio";
 
-import type {
-  BulldogjobSearchFilters,
-  JobListing,
-  SourceConfig
-} from "../types.js";
+import type { BulldogjobSearchFilters, JobListing, SourceConfig } from "../types.js";
 import type { SourceAdapter } from "./types.js";
 
 function cleanText(value?: string): string | undefined {
@@ -23,11 +19,7 @@ function isJobPathname(pathname: string): boolean {
 export class BulldogjobAdapter implements SourceAdapter<"bulldogjob"> {
   readonly source = "bulldogjob" as const;
 
-  buildSearchUrl(
-    filters: BulldogjobSearchFilters,
-    baseUrl: string,
-    page = 1
-  ): string {
+  buildSearchUrl(filters: BulldogjobSearchFilters, baseUrl: string, page = 1): string {
     if (!filters.keyword) {
       throw new Error("Bulldogjob requires filters.keyword");
     }
@@ -62,9 +54,7 @@ export class BulldogjobAdapter implements SourceAdapter<"bulldogjob"> {
       const company =
         cleanText($(element).find("img[alt]").first().attr("alt")) ??
         cleanText(titleBlock.find("div").first().text());
-      const location = cleanText(
-        titleBlock.next().find("div").first().text()
-      );
+      const location = cleanText(titleBlock.next().find("div").first().text());
 
       if (!title || !company) {
         return;

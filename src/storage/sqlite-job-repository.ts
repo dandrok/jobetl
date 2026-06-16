@@ -68,8 +68,10 @@ export class SQLiteJobRepository {
       );
     `);
 
-    const tableInfo = this.database.prepare("PRAGMA table_info(jobs)").all() as Array<{ name: string }>;
-    const hasIsApplied = tableInfo.some(col => col.name === 'is_applied');
+    const tableInfo = this.database.prepare("PRAGMA table_info(jobs)").all() as Array<{
+      name: string;
+    }>;
+    const hasIsApplied = tableInfo.some((col) => col.name === "is_applied");
     if (!hasIsApplied) {
       this.database.exec("ALTER TABLE jobs ADD COLUMN is_applied INTEGER NOT NULL DEFAULT 0;");
     }
@@ -106,18 +108,21 @@ export class SQLiteJobRepository {
   private updateJobStatus(externalId: string, status: StoredJob["status"]): void {
     const now = new Date().toISOString();
     this.database
-      .prepare(`
+      .prepare(
+        `
         UPDATE jobs
         SET status = ?, updated_at = ?
         WHERE external_id = ?
-      `)
+      `
+      )
       .run(status, now, externalId);
   }
 
   upsertDiscoveredJob(job: JobListing): void {
     const now = new Date().toISOString();
     this.database
-      .prepare(`
+      .prepare(
+        `
         INSERT INTO jobs (
           external_id, source, url, title, company, salary_text, location, status, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'discovered', ?, ?)
@@ -139,7 +144,8 @@ export class SQLiteJobRepository {
             THEN jobs.updated_at
             ELSE excluded.updated_at
           END
-      `)
+      `
+      )
       .run(
         job.externalId,
         job.source,
@@ -156,18 +162,21 @@ export class SQLiteJobRepository {
   saveFetchedOffer(externalId: string, offerMarkdown: string): void {
     const now = new Date().toISOString();
     this.database
-      .prepare(`
+      .prepare(
+        `
         UPDATE jobs
         SET offer_markdown = ?, status = 'fetched', updated_at = ?
         WHERE external_id = ?
-      `)
+      `
+      )
       .run(offerMarkdown, now, externalId);
   }
 
   saveScoredJob(candidate: MatchCandidate): void {
     const now = new Date().toISOString();
     this.database
-      .prepare(`
+      .prepare(
+        `
         UPDATE jobs
         SET
           offer_markdown = ?,
@@ -177,7 +186,8 @@ export class SQLiteJobRepository {
           status = ?,
           updated_at = ?
         WHERE external_id = ?
-      `)
+      `
+      )
       .run(
         candidate.job.offerMarkdown,
         candidate.match.score,
@@ -213,15 +223,24 @@ export class SQLiteJobRepository {
     `;
 
     const params = [
-      job.externalId, job.source, job.url, job.title, job.company,
-      job.salaryText ?? null, job.location ?? null, job.offerMarkdown ?? null,
-      job.matchScore ?? null, job.matchReason ?? null, job.summary ?? null, job.status
+      job.externalId,
+      job.source,
+      job.url,
+      job.title,
+      job.company,
+      job.salaryText ?? null,
+      job.location ?? null,
+      job.offerMarkdown ?? null,
+      job.matchScore ?? null,
+      job.matchReason ?? null,
+      job.summary ?? null,
+      job.status
     ];
-    
+
     if (hasIsApplied) {
       params.push(job.isApplied ? 1 : 0);
     }
-    
+
     params.push(job.createdAt, job.updatedAt);
     this.database.prepare(sql).run(...params);
   }
@@ -229,13 +248,15 @@ export class SQLiteJobRepository {
   updateJobAppliedStatus(externalId: string, isApplied: boolean): boolean {
     const now = new Date().toISOString();
     const result = this.database
-      .prepare(`
+      .prepare(
+        `
         UPDATE jobs
         SET is_applied = ?, updated_at = ?
         WHERE external_id = ?
-      `)
+      `
+      )
       .run(isApplied ? 1 : 0, now, externalId);
-    
+
     return result.changes > 0;
   }
 
@@ -249,12 +270,14 @@ export class SQLiteJobRepository {
 
   listMatchedJobs(limit = 20): StoredJob[] {
     const rows = this.database
-      .prepare(`
+      .prepare(
+        `
         SELECT * FROM jobs
         WHERE status = 'matched'
         ORDER BY match_score DESC, updated_at DESC
         LIMIT ?
-      `)
+      `
+      )
       .all(limit) as unknown as JobRow[];
 
     return rows.map(mapRow);

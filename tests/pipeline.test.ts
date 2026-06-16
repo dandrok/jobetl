@@ -262,8 +262,7 @@ function createDependencies(
 ): PipelineDependencies {
   const loadResumeMarkdown =
     overrides.loadResumeMarkdown ?? vi.fn(async () => "# Resume\n\nNode.js and ETL");
-  const countStoredJobs =
-    overrides.countStoredJobs ?? vi.fn(() => repository.jobs.size);
+  const countStoredJobs = overrides.countStoredJobs ?? vi.fn(() => repository.jobs.size);
   const adapters = Array.isArray(listingsOrAdapters)
     ? createAdapters({ justjoinit: listingsOrAdapters })
     : listingsOrAdapters;
@@ -273,8 +272,7 @@ function createDependencies(
     fetchListingHtml: overrides.fetchListingHtml ?? vi.fn(async () => "<html />"),
     loadResumeMarkdown,
     fetchOfferMarkdown:
-      overrides.fetchOfferMarkdown ??
-      vi.fn(async (url: string) => `# Markdown for ${url}`),
+      overrides.fetchOfferMarkdown ?? vi.fn(async (url: string) => `# Markdown for ${url}`),
     scoreOffer:
       overrides.scoreOffer ??
       vi.fn(async (_job: JobOffer, _resumeMarkdown: string) => createMatchResult(0.9)),
@@ -353,12 +351,7 @@ describe("runPipeline", () => {
     });
     const dependencies = createDependencies(repository, adapters);
 
-    const summary = await runPipeline(
-      config,
-      undefined,
-      dependencies,
-      { source: "nofluffjobs" }
-    );
+    const summary = await runPipeline(config, undefined, dependencies, { source: "nofluffjobs" });
 
     expect(summary.scanned).toBe(1);
     expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
@@ -375,12 +368,7 @@ describe("runPipeline", () => {
     });
     const dependencies = createDependencies(repository, adapters);
 
-    const summary = await runPipeline(
-      config,
-      undefined,
-      dependencies,
-      { source: "bulldogjob" }
-    );
+    const summary = await runPipeline(config, undefined, dependencies, { source: "bulldogjob" });
 
     expect(summary.scanned).toBe(1);
     expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
@@ -399,12 +387,7 @@ describe("runPipeline", () => {
     });
     const dependencies = createDependencies(repository, adapters);
 
-    const summary = await runPipeline(
-      config,
-      undefined,
-      dependencies,
-      { source: "pracujpl" }
-    );
+    const summary = await runPipeline(config, undefined, dependencies, { source: "pracujpl" });
 
     expect(summary.scanned).toBe(1);
     expect(adapters.justjoinit.discoverListings).not.toHaveBeenCalled();
@@ -424,14 +407,14 @@ describe("runPipeline", () => {
     ]);
     const fetchOfferMarkdown = vi.fn(async (url: string) => `# ${url}`);
     const scoreOffer = vi.fn(async () => createMatchResult(0.2));
-    const dependencies = createDependencies(repository, [
-      matchedListing,
-      rejectedListing,
-      freshListing
-    ], {
-      fetchOfferMarkdown,
-      scoreOffer
-    });
+    const dependencies = createDependencies(
+      repository,
+      [matchedListing, rejectedListing, freshListing],
+      {
+        fetchOfferMarkdown,
+        scoreOffer
+      }
+    );
 
     const summary = await runPipeline(config, undefined, dependencies);
 
@@ -500,9 +483,7 @@ describe("runPipeline", () => {
       scoreOffer
     });
 
-    await expect(runPipeline(config, undefined, dependencies)).rejects.toThrow(
-      "resume missing"
-    );
+    await expect(runPipeline(config, undefined, dependencies)).rejects.toThrow("resume missing");
     expect(loadResumeMarkdown).toHaveBeenCalledWith(config.resumeMarkdownPath);
     expect(fetchOfferMarkdown).not.toHaveBeenCalled();
     expect(scoreOffer).not.toHaveBeenCalled();
@@ -612,9 +593,7 @@ describe("runPipeline", () => {
     const config = createConfig();
     const skippedListing = createListing("skip-me");
     const freshListing = createListing("process-me");
-    const repository = createRepository([
-      { listing: skippedListing, status: "matched" }
-    ]);
+    const repository = createRepository([{ listing: skippedListing, status: "matched" }]);
     const fetchDeferred = createDeferred<string>();
     const scoreDeferred = createDeferred<MatchResult>();
     const snapshots: PipelineProgressSnapshot[] = [];
@@ -718,9 +697,7 @@ describe("runPipeline", () => {
       formatPipelineProgressText(
         snapshots.find(
           (snapshot) =>
-            snapshot.stage === "fetching" &&
-            snapshot.queuedScore === 1 &&
-            snapshot.scoring === 0
+            snapshot.stage === "fetching" && snapshot.queuedScore === 1 && snapshot.scoring === 0
         )!
       )
     ).toContain("stage: scoring");
@@ -924,9 +901,9 @@ describe("runPipeline", () => {
 
     const { runPipeline: runPipelineWithMockedQueue } = await import("../src/pipeline/run.js");
 
-    await expect(
-      runPipelineWithMockedQueue(config, undefined, dependencies)
-    ).rejects.toThrow("fetch worker exploded");
+    await expect(runPipelineWithMockedQueue(config, undefined, dependencies)).rejects.toThrow(
+      "fetch worker exploded"
+    );
     expect(scoreQueueCloseCount).toBe(1);
   });
 });
