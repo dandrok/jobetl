@@ -42,9 +42,8 @@ describe("notion sync progress", () => {
       default: ora
     }));
 
-    const { OraNotionSyncProgressReporter } = await import(
-      "../src/notion/ora-progress-reporter.js"
-    );
+    const { OraNotionSyncProgressReporter } =
+      await import("../src/notion/ora-progress-reporter.js");
 
     const reporter = new OraNotionSyncProgressReporter();
     const startSnapshot = createSnapshot({
@@ -57,9 +56,7 @@ describe("notion sync progress", () => {
 
     reporter.start(startSnapshot);
 
-    expect(spinner.start).toHaveBeenCalledWith(
-      formatNotionSyncProgressText(startSnapshot)
-    );
+    expect(spinner.start).toHaveBeenCalledWith(formatNotionSyncProgressText(startSnapshot));
 
     const updateSnapshot = createSnapshot({
       processed: 5,

@@ -38,12 +38,7 @@ export type JobStatus =
   | "rejected"
   | "error";
 
-export type PipelineStage =
-  | "discovering"
-  | "fetching"
-  | "scoring"
-  | "mixed"
-  | "done";
+export type PipelineStage = "discovering" | "fetching" | "scoring" | "mixed" | "done";
 
 export interface PipelineProgressSnapshot {
   stage: PipelineStage;

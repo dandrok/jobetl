@@ -1,9 +1,6 @@
 import ora, { type Ora } from "ora";
 
-import {
-  formatPipelineProgressText,
-  formatRunStartText
-} from "./formatters.js";
+import { formatPipelineProgressText, formatRunStartText } from "./formatters.js";
 import type { PipelineProgressSnapshot } from "../types.js";
 
 export interface ProgressReporter {

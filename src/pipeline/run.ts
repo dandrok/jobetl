@@ -127,9 +127,7 @@ function createPipelineDependencies(
   return {
     adapters: overrides.adapters ?? createSourceAdapters(),
     fetchListingHtml: overrides.fetchListingHtml ?? fetchText,
-    loadResumeMarkdown:
-      overrides.loadResumeMarkdown ??
-      ((path: string) => readFile(path, "utf8")),
+    loadResumeMarkdown: overrides.loadResumeMarkdown ?? ((path: string) => readFile(path, "utf8")),
     fetchOfferMarkdown:
       overrides.fetchOfferMarkdown ??
       (async (url: string) => ensureClients().jina.fetchMarkdown(url)),
@@ -167,11 +165,7 @@ export async function runPipeline(
 
     progress[method](progressSnapshot);
   };
-  const selectedSources = selectSources(
-    config,
-    dependencies.adapters,
-    options.source
-  );
+  const selectedSources = selectSources(config, dependencies.adapters, options.source);
   const discoveredListings = await Promise.all(
     selectedSources.map((selectedSource) =>
       discoverSource(selectedSource, dependencies.fetchListingHtml)
