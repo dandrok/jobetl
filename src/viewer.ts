@@ -93,8 +93,8 @@ function startViewer() {
     process.exit(1);
   });
 
-  server.listen(3000, () => {
-    console.log("✨ JobETL Dashboard is running at http://localhost:3000");
+  server.listen(3001, () => {
+    console.log("✨ JobETL Backend API is running at http://localhost:3001");
   });
 }
 

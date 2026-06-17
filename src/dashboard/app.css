@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: #1c1b1a;
+  --color-bg-surface: #242322;
+  --color-border-subtle: #363432;
+  --color-border-hover: #484542;
+  
+  --color-text-primary: #ebeae8;
+  --color-text-secondary: #a3a19d;
+  --color-text-tertiary: #73716d;
+  
+  --color-accent: #d9b89c;
+  --color-accent-light: rgba(217, 184, 156, 0.1);
+  
+  --color-success: #a3e635;
+  --color-danger: #f43f5e;
+}
+
+@layer base {
+  :root, [data-theme="dark"] {
+    --bg-base: var(--color-bg-base);
+    --bg-surface: var(--color-bg-surface);
+    --border-subtle: var(--color-border-subtle);
+    --border-hover: var(--color-border-hover);
+    --text-primary: var(--color-text-primary);
+    --text-secondary: var(--color-text-secondary);
+    --text-tertiary: var(--color-text-tertiary);
+    --accent: var(--color-accent);
+    --accent-light: var(--color-accent-light);
+    --success: var(--color-success);
+    --danger: var(--color-danger);
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --bg-active: rgba(255, 255, 255, 0.1);
+  }
+
+  [data-theme="light"] {
+    --bg-base: #FAF8F5;
+    --bg-surface: #FFFFFF;
+    --border-subtle: #E5E3DB;
+    --border-hover: #D1CEC2;
+    --text-primary: #1C1917;
+    --text-secondary: #57534E;
+    --text-tertiary: #A8A29E;
+    --accent: #D97757;
+    --accent-light: rgba(217, 119, 87, 0.1);
+    --success: #3F6212;
+    --danger: #9F1239;
+    --bg-hover: rgba(0, 0, 0, 0.05);
+    --bg-active: rgba(0, 0, 0, 0.1);
+  }
+
+  body {
+    @apply bg-[var(--bg-base)] text-[var(--text-primary)] font-sans min-h-screen flex flex-col m-0 w-full overflow-x-hidden;
+  }
+
+  #app {
+    @apply flex flex-col flex-1 w-full min-w-0;
+  }
+
+  /* Focus States for A11y */
+  :focus-visible {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: 2px !important;
+  }
+}
+
+@utility transition-theme {
+  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+}
+
+@utility transition-panel {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  will-change: transform, margin-left;
+}
+
+@utility transition-drawer {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), right 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  will-change: transform;
+}

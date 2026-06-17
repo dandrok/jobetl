@@ -9,16 +9,20 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "tsx src/cli.ts",
+    "dev:ui": "vite",
+    "build:ui": "vite build",
     "report": "tsx src/report.ts",
     "import:notion": "tsx src/import-notion.ts",
     "sync:notion": "tsx src/sync-notion.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:clear": "node -e \"const fs=require('fs'); if(fs.existsSync('data/jobetl.db')) fs.unlinkSync('data/jobetl.db');\"",
-    "dashboard": "tsx src/viewer.ts",
+    "api": "tsx src/viewer.ts",
+    "dashboard": "concurrently \"npm run api\" \"npm run dev:ui\" --kill-others",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'"
+    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
+    "check": "npm run format:check && npm run lint && npm run build && npm run test"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.29",
@@ -30,14 +34,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^25.6.0",
+    "concurrently": "^10.0.3",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "prettier": "^3.8.4",
+    "svelte": "^5.56.3",
+    "svelte-check": "^4.6.0",
+    "tailwindcss": "^4.3.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.61.1",
+    "vite": "^8.0.16",
     "vitest": "^4.1.4"
   }
 }
