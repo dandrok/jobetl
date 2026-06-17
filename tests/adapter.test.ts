@@ -123,11 +123,11 @@ describe("NoFluffJobsAdapter", () => {
     const page2 = readFileSync("tests/fixtures/nofluffjobs-listing-page2.html", "utf8");
     const adapter = new NoFluffJobsAdapter();
     const fetchHtml = vi.fn(async (url: string) => {
-      if (url === "https://nofluffjobs.com/pl/warszawa/javascript") {
+      if (url === "https://nofluffjobs.com/pl/warszawa/javascript?sort=newest") {
         return page1;
       }
 
-      if (url === "https://nofluffjobs.com/pl/warszawa/javascript?page=2") {
+      if (url === "https://nofluffjobs.com/pl/warszawa/javascript?sort=newest&page=2") {
         return page2;
       }
 
@@ -148,8 +148,8 @@ describe("NoFluffJobsAdapter", () => {
     );
 
     expect(fetchHtml.mock.calls.map(([url]) => url)).toEqual([
-      "https://nofluffjobs.com/pl/warszawa/javascript",
-      "https://nofluffjobs.com/pl/warszawa/javascript?page=2"
+      "https://nofluffjobs.com/pl/warszawa/javascript?sort=newest",
+      "https://nofluffjobs.com/pl/warszawa/javascript?sort=newest&page=2"
     ]);
     expect(offers).toHaveLength(3);
     expect(offers[0]).toMatchObject({
