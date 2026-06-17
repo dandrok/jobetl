@@ -1,56 +1,44 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { eq, desc, sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
+import { jobsTable } from "./schema";
 import type { JobListing, MatchCandidate, StoredJob } from "@core/types";
 
-interface JobRow {
-  external_id: string;
-  source: string;
-  url: string;
-  title: string;
-  company: string;
-  salary_text: string | null;
-  location: string | null;
-  offer_markdown: string | null;
-  match_score: number | null;
-  match_reason: string | null;
-  summary: string | null;
-  status: string;
-  is_applied: number;
-  posted_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-function mapRow(row: JobRow): StoredJob {
+function mapRow(row: typeof jobsTable.$inferSelect): StoredJob {
   return {
-    externalId: row.external_id,
+    externalId: row.externalId,
     source: row.source as StoredJob["source"],
     url: row.url,
     title: row.title,
     company: row.company,
-    salaryText: row.salary_text ?? undefined,
+    salaryText: row.salaryText ?? undefined,
     location: row.location ?? undefined,
-    offerMarkdown: row.offer_markdown ?? undefined,
-    matchScore: row.match_score ?? undefined,
-    matchReason: row.match_reason ?? undefined,
+    offerMarkdown: row.offerMarkdown ?? undefined,
+    matchScore: row.matchScore ?? undefined,
+    matchReason: row.matchReason ?? undefined,
     summary: row.summary ?? undefined,
     status: row.status as StoredJob["status"],
-    isApplied: Boolean(row.is_applied),
-    postedAt: row.posted_at ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    isApplied: Boolean(row.isApplied),
+    postedAt: row.postedAt ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
   };
 }
 
 export class SQLiteJobRepository {
-  private readonly database: DatabaseSync;
+  private readonly db: BetterSQLite3Database;
 
   constructor(databasePath: string) {
     mkdirSync(dirname(databasePath), { recursive: true });
-    this.database = new DatabaseSync(databasePath);
-    this.database.exec(`
+    const sqlite = new Database(databasePath);
+    this.db = drizzle(sqlite);
+
+    // Auto-create table since it's a local tool
+    sqlite.exec(`
       CREATE TABLE IF NOT EXISTS jobs (
         external_id TEXT PRIMARY KEY,
         source TEXT NOT NULL,
@@ -66,37 +54,41 @@ export class SQLiteJobRepository {
         status TEXT NOT NULL,
         is_applied INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        posted_at TEXT
       );
     `);
 
-    const tableInfo = this.database.prepare("PRAGMA table_info(jobs)").all() as Array<{
-      name: string;
-    }>;
+    // Add columns if migrating from old schema without drizzle migrations
+    const tableInfo = sqlite.prepare("PRAGMA table_info(jobs)").all() as Array<{ name: string }>;
     const hasIsApplied = tableInfo.some((col) => col.name === "is_applied");
     if (!hasIsApplied) {
-      this.database.exec("ALTER TABLE jobs ADD COLUMN is_applied INTEGER NOT NULL DEFAULT 0;");
+      sqlite.exec("ALTER TABLE jobs ADD COLUMN is_applied INTEGER NOT NULL DEFAULT 0;");
     }
     const hasPostedAt = tableInfo.some((col) => col.name === "posted_at");
     if (!hasPostedAt) {
-      this.database.exec("ALTER TABLE jobs ADD COLUMN posted_at TEXT;");
+      sqlite.exec("ALTER TABLE jobs ADD COLUMN posted_at TEXT;");
     }
   }
 
   hasExternalId(externalId: string): boolean {
-    const row = this.database
-      .prepare("SELECT external_id FROM jobs WHERE external_id = ? LIMIT 1")
-      .get(externalId) as { external_id: string } | undefined;
-
+    const row = this.db
+      .select({ externalId: jobsTable.externalId })
+      .from(jobsTable)
+      .where(eq(jobsTable.externalId, externalId))
+      .limit(1)
+      .get();
     return Boolean(row);
   }
 
   getJobStatus(externalId: string): StoredJob["status"] | undefined {
-    const row = this.database
-      .prepare("SELECT status FROM jobs WHERE external_id = ? LIMIT 1")
-      .get(externalId) as { status: StoredJob["status"] } | undefined;
-
-    return row?.status;
+    const row = this.db
+      .select({ status: jobsTable.status })
+      .from(jobsTable)
+      .where(eq(jobsTable.externalId, externalId))
+      .limit(1)
+      .get();
+    return row?.status as StoredJob["status"] | undefined;
   }
 
   markJobFetching(externalId: string): void {
@@ -113,186 +105,146 @@ export class SQLiteJobRepository {
 
   private updateJobStatus(externalId: string, status: StoredJob["status"]): void {
     const now = new Date().toISOString();
-    this.database
-      .prepare(
-        `
-        UPDATE jobs
-        SET status = ?, updated_at = ?
-        WHERE external_id = ?
-      `
-      )
-      .run(status, now, externalId);
+    this.db
+      .update(jobsTable)
+      .set({ status, updatedAt: now })
+      .where(eq(jobsTable.externalId, externalId))
+      .run();
   }
 
   upsertDiscoveredJob(listing: JobListing): void {
     const now = new Date().toISOString();
     const discoveredAt = listing.discoveredAt || now;
 
-    this.database
-      .prepare(
-        `
-        INSERT INTO jobs (
-          external_id, source, url, title, company, salary_text, location, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'discovered', ?, ?)
-        ON CONFLICT(external_id) DO UPDATE SET
-          source = excluded.source,
-          url = excluded.url,
-          title = excluded.title,
-          company = excluded.company,
-          salary_text = excluded.salary_text,
-          location = excluded.location,
-          updated_at = CASE
-            WHEN
-              jobs.source IS excluded.source AND
-              jobs.url IS excluded.url AND
-              jobs.title IS excluded.title AND
-              jobs.company IS excluded.company AND
-              jobs.salary_text IS excluded.salary_text AND
-              jobs.location IS excluded.location
-            THEN jobs.updated_at
-            ELSE excluded.updated_at
-          END
-      `
-      )
-      .run(
-        listing.externalId,
-        listing.source,
-        listing.url,
-        listing.title,
-        listing.company,
-        listing.salaryText ?? null,
-        listing.location ?? null,
-        discoveredAt,
-        now
-      );
+    this.db
+      .insert(jobsTable)
+      .values({
+        externalId: listing.externalId,
+        source: listing.source,
+        url: listing.url,
+        title: listing.title,
+        company: listing.company,
+        salaryText: listing.salaryText ?? null,
+        location: listing.location ?? null,
+        status: "discovered",
+        createdAt: discoveredAt,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: jobsTable.externalId,
+        set: {
+          source: listing.source,
+          url: listing.url,
+          title: listing.title,
+          company: listing.company,
+          salaryText: listing.salaryText ?? null,
+          location: listing.location ?? null,
+          updatedAt: sql`
+            CASE
+              WHEN jobs.source IS ${listing.source} AND
+                   jobs.url IS ${listing.url} AND
+                   jobs.title IS ${listing.title} AND
+                   jobs.company IS ${listing.company} AND
+                   jobs.salary_text IS ${listing.salaryText ?? null} AND
+                   jobs.location IS ${listing.location ?? null}
+              THEN jobs.updated_at
+              ELSE ${now}
+            END
+          `
+        }
+      })
+      .run();
   }
 
   saveFetchedOffer(externalId: string, offerMarkdown: string): void {
     const now = new Date().toISOString();
-    this.database
-      .prepare(
-        `
-        UPDATE jobs
-        SET offer_markdown = ?, status = 'fetched', updated_at = ?
-        WHERE external_id = ?
-      `
-      )
-      .run(offerMarkdown, now, externalId);
+    this.db
+      .update(jobsTable)
+      .set({ offerMarkdown, status: "fetched", updatedAt: now })
+      .where(eq(jobsTable.externalId, externalId))
+      .run();
   }
 
   saveScoredJob(candidate: MatchCandidate): void {
     const now = new Date().toISOString();
-    this.database
-      .prepare(
-        `
-        UPDATE jobs
-        SET
-          offer_markdown = ?,
-          match_score = ?,
-          match_reason = ?,
-          summary = ?,
-          status = ?,
-          updated_at = ?
-        WHERE external_id = ?
-      `
-      )
-      .run(
-        candidate.job.offerMarkdown,
-        candidate.match.score,
-        candidate.match.reason,
-        candidate.match.summary,
-        candidate.match.shouldSave ? "matched" : "rejected",
-        now,
-        candidate.job.externalId
-      );
+    this.db
+      .update(jobsTable)
+      .set({
+        offerMarkdown: candidate.job.offerMarkdown,
+        matchScore: candidate.match.score,
+        matchReason: candidate.match.reason,
+        summary: candidate.match.summary,
+        status: candidate.match.shouldSave ? "matched" : "rejected",
+        updatedAt: now
+      })
+      .where(eq(jobsTable.externalId, candidate.job.externalId))
+      .run();
   }
 
   upsertStoredJob(job: StoredJob): void {
-    const hasIsApplied = typeof job.isApplied === "boolean";
-    const hasPostedAt = typeof job.postedAt === "string";
-    const sql = `
-      INSERT INTO jobs (
-        external_id, source, url, title, company, salary_text, location, offer_markdown, match_score, match_reason, summary, status, ${hasIsApplied ? "is_applied, " : ""}${hasPostedAt ? "posted_at, " : ""}created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasIsApplied ? "?, " : ""}${hasPostedAt ? "?, " : ""}?, ?)
-      ON CONFLICT(external_id) DO UPDATE SET
-        source = excluded.source,
-        url = excluded.url,
-        title = excluded.title,
-        company = excluded.company,
-        salary_text = excluded.salary_text,
-        location = excluded.location,
-        offer_markdown = excluded.offer_markdown,
-        match_score = excluded.match_score,
-        match_reason = excluded.match_reason,
-        summary = excluded.summary,
-        status = excluded.status,
-        ${hasIsApplied ? "is_applied = excluded.is_applied," : ""}
-        ${hasPostedAt ? "posted_at = excluded.posted_at," : ""}
-        created_at = excluded.created_at,
-        updated_at = excluded.updated_at
-    `;
+    const setClause: any = {
+      source: job.source,
+      url: job.url,
+      title: job.title,
+      company: job.company,
+      salaryText: job.salaryText ?? null,
+      location: job.location ?? null,
+      offerMarkdown: job.offerMarkdown ?? null,
+      matchScore: job.matchScore ?? null,
+      matchReason: job.matchReason ?? null,
+      summary: job.summary ?? null,
+      status: job.status,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt
+    };
 
-    const params = [
-      job.externalId,
-      job.source,
-      job.url,
-      job.title,
-      job.company,
-      job.salaryText ?? null,
-      job.location ?? null,
-      job.offerMarkdown ?? null,
-      job.matchScore ?? null,
-      job.matchReason ?? null,
-      job.summary ?? null,
-      job.status
-    ];
-
-    if (hasIsApplied) {
-      params.push(job.isApplied ? 1 : 0);
+    if (typeof job.isApplied === "boolean") {
+      setClause.isApplied = job.isApplied ? 1 : 0;
     }
     if (typeof job.postedAt === "string") {
-      params.push(job.postedAt);
+      setClause.postedAt = job.postedAt;
     }
 
-    params.push(job.createdAt, job.updatedAt);
-    this.database.prepare(sql).run(...params);
+    const values = {
+      externalId: job.externalId,
+      ...setClause,
+      isApplied: setClause.isApplied ?? 0,
+      postedAt: setClause.postedAt ?? null
+    };
+
+    this.db
+      .insert(jobsTable)
+      .values(values)
+      .onConflictDoUpdate({
+        target: jobsTable.externalId,
+        set: setClause
+      })
+      .run();
   }
 
   updateJobAppliedStatus(externalId: string, isApplied: boolean): boolean {
     const now = new Date().toISOString();
-    const result = this.database
-      .prepare(
-        `
-        UPDATE jobs
-        SET is_applied = ?, updated_at = ?
-        WHERE external_id = ?
-      `
-      )
-      .run(isApplied ? 1 : 0, now, externalId);
-
+    const result = this.db
+      .update(jobsTable)
+      .set({ isApplied: isApplied ? 1 : 0, updatedAt: now })
+      .where(eq(jobsTable.externalId, externalId))
+      .run();
     return result.changes > 0;
   }
 
   listJobs(): StoredJob[] {
-    const rows = this.database
-      .prepare("SELECT * FROM jobs ORDER BY updated_at DESC")
-      .all() as unknown as JobRow[];
-
+    const rows = this.db.select().from(jobsTable).orderBy(desc(jobsTable.updatedAt)).all();
     return rows.map(mapRow);
   }
 
   listMatchedJobs(limit = 20): StoredJob[] {
-    const rows = this.database
-      .prepare(
-        `
-        SELECT * FROM jobs
-        WHERE status = 'matched'
-        ORDER BY match_score DESC, updated_at DESC
-        LIMIT ?
-      `
-      )
-      .all(limit) as unknown as JobRow[];
-
+    const rows = this.db
+      .select()
+      .from(jobsTable)
+      .where(eq(jobsTable.status, "matched"))
+      .orderBy(desc(jobsTable.matchScore), desc(jobsTable.updatedAt))
+      .limit(limit)
+      .all();
     return rows.map(mapRow);
   }
 }
