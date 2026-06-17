@@ -133,6 +133,7 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
   parseListings(html: string, baseUrl = JUSTJOINIT_ROOT): JobListing[] {
     const $ = cheerio.load(html);
     const offers = new Map<string, JobListing>();
+    const partialFailures = new Map<string, { url: string; error: Error }>();
 
     $('a[href*="/job-offer/"]').each((_, element) => {
       const href = $(element).attr("href");
@@ -142,6 +143,12 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
 
       const url = normalizeUrl(href, baseUrl);
       const externalId = `${this.source}:${new URL(url).pathname}`;
+
+      // If we already successfully parsed this job from a previous element, skip
+      if (offers.has(externalId)) {
+        return;
+      }
+
       const parent = $(element).parent();
       const textNodes = extractLeafTexts($, parent);
 
@@ -199,11 +206,10 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
       if (!title || !company) {
         // We log partial extraction failure if we have a URL but missing core text
         if (title || company) {
-          Telemetry.recordScrapeValidationFailure(
-            this.source,
+          partialFailures.set(externalId, {
             url,
-            new Error("Missing required title or company from DOM")
-          );
+            error: new Error("Missing required title or company from DOM")
+          });
         }
         return;
       }
@@ -221,10 +227,19 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
       const result = JobListingSchema.safeParse(rawOffer);
       if (result.success) {
         offers.set(externalId, result.data);
+        // If successfully parsed, remove any previously logged failure for this ID
+        partialFailures.delete(externalId);
       } else {
-        Telemetry.recordScrapeValidationFailure(this.source, url, result.error);
+        partialFailures.set(externalId, { url, error: result.error });
       }
     });
+
+    // Log validation failures ONLY for URLs that failed entirely across all matches
+    for (const [externalId, failure] of partialFailures.entries()) {
+      if (!offers.has(externalId)) {
+        Telemetry.recordScrapeValidationFailure(this.source, failure.url, failure.error);
+      }
+    }
 
     return [...offers.values()];
   }
