@@ -110,6 +110,12 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
       }
     }
 
-    return offers.slice(0, config.maxListings);
+    const finalOffers = offers.slice(0, config.maxListings);
+    const scrapeTime = Date.now();
+
+    return finalOffers.map((offer, index) => ({
+      ...offer,
+      discoveredAt: new Date(scrapeTime - index * 1000).toISOString()
+    }));
   }
 }

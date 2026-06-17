@@ -40,6 +40,8 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
     }
 
     const url = new URL(segments.join(""), baseUrl);
+    url.searchParams.set("sort", "newest");
+
     if (page > 1) {
       url.searchParams.set("page", String(page));
     }
@@ -53,7 +55,8 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
 
     $('a[href^="/pl/job/"]').each((_, element) => {
       const href = $(element).attr("href");
-      const title = cleanText($(element).find("h3").first().text())?.replace(/\s+NOWA$/u, "");
+      const rawTitle = cleanText($(element).find("h3").first().text()) ?? "";
+      const title = rawTitle.replace(/\s+NOWA$/u, "");
       const company = cleanText($(element).find("h4").first().text());
       const salaryText = $(element)
         .find("div, span")
@@ -108,6 +111,12 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
       }
     }
 
-    return offers.slice(0, config.maxListings);
+    const finalOffers = offers.slice(0, config.maxListings);
+    const scrapeTime = Date.now();
+
+    return finalOffers.map((offer, index) => ({
+      ...offer,
+      discoveredAt: new Date(scrapeTime - index * 1000).toISOString()
+    }));
   }
 }
