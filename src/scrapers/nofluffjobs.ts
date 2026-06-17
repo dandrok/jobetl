@@ -1,6 +1,8 @@
 import * as cheerio from "cheerio";
 
 import type { JobListing, NoFluffJobsSearchFilters, SourceConfig } from "@core/types";
+import { JobListingSchema } from "@core/types";
+import { Telemetry } from "@core/telemetry";
 import type { SourceAdapter } from "@scrapers/types";
 
 function cleanText(value?: string): string | undefined {
@@ -69,13 +71,21 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
       );
 
       if (!href || !title || !company) {
+        if (href) {
+          const debugUrl = new URL(href, baseUrl).toString();
+          Telemetry.recordScrapeValidationFailure(
+            this.source,
+            debugUrl,
+            new Error("Missing required title or company from DOM") as any
+          );
+        }
         return;
       }
 
       const url = new URL(href, baseUrl).toString();
       const externalId = `${this.source}:${new URL(url).pathname}`;
 
-      offers.set(externalId, {
+      const rawOffer = {
         externalId,
         source: this.source,
         url,
@@ -83,7 +93,14 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
         company,
         salaryText: salaryText ? normalizeSalaryText(salaryText) : undefined,
         location
-      });
+      };
+
+      const result = JobListingSchema.safeParse(rawOffer);
+      if (result.success) {
+        offers.set(externalId, result.data);
+      } else {
+        Telemetry.recordScrapeValidationFailure(this.source, url, result.error);
+      }
     });
 
     return [...offers.values()];
@@ -111,6 +128,9 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
       }
     }
 
+    if (offers.length === 0) {
+      Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
+    }
     const finalOffers = offers.slice(0, config.maxListings);
     const scrapeTime = Date.now();
 

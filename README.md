@@ -19,7 +19,8 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`
 - Full-offer extraction: Jina Reader
 - AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
-- Storage: local SQLite (`./data/jobetl.db`)
+- Storage: local SQLite (`./data/jobetl.db`) managed via **Drizzle ORM**
+- UI: Svelte 5 + Vite
 - Optional sync: Notion
 - Automation: GitHub Actions
 
@@ -125,10 +126,10 @@ Review the best saved matches in the terminal:
 npm run report
 ```
 
-Launch the interactive local Web Dashboard (includes filtering, sorting, and CV sent tracking):
+Launch the interactive Svelte Web Dashboard:
 
 ```bash
-npm run dashboard
+npm run dev:ui
 ```
 
 Optional Notion sync commands:

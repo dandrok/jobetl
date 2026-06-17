@@ -1,6 +1,8 @@
 import * as cheerio from "cheerio";
 
 import type { JobListing, JustJoinItSearchFilters, SourceConfig } from "@core/types";
+import { JobListingSchema } from "@core/types";
+import { Telemetry } from "@core/telemetry";
 import type { SourceAdapter } from "@scrapers/types";
 
 const JUSTJOINIT_ROOT = "https://justjoin.it";
@@ -111,7 +113,12 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
   ): Promise<JobListing[]> {
     const html = await fetchHtml(this.buildSearchUrl(config.filters, config.baseUrl));
 
-    const finalOffers = this.parseListings(html, config.baseUrl).slice(0, config.maxListings);
+    const allOffers = this.parseListings(html, config.baseUrl);
+    if (allOffers.length === 0) {
+      Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
+    }
+
+    const finalOffers = allOffers.slice(0, config.maxListings);
     const scrapeTime = Date.now();
 
     return finalOffers.map((offer, index) => ({
@@ -187,10 +194,18 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
       }
 
       if (!title || !company) {
+        // We log partial extraction failure if we have a URL but missing core text
+        if (title || company) {
+          Telemetry.recordScrapeValidationFailure(
+            this.source,
+            url,
+            new Error("Missing required title or company from DOM") as any
+          );
+        }
         return;
       }
 
-      offers.set(externalId, {
+      const rawOffer = {
         externalId,
         source: this.source,
         url,
@@ -198,7 +213,14 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
         company,
         salaryText,
         location
-      });
+      };
+
+      const result = JobListingSchema.safeParse(rawOffer);
+      if (result.success) {
+        offers.set(externalId, result.data);
+      } else {
+        Telemetry.recordScrapeValidationFailure(this.source, url, result.error);
+      }
     });
 
     return [...offers.values()];
