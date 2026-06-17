@@ -14,7 +14,7 @@
   let displayJob = $state<StoredJob | null>(null);
 
   $effect(() => {
-    if (job) displayJob = job;
+    displayJob = job;
   });
 </script>
 
@@ -68,7 +68,7 @@
       </h2>
 
       <div class="flex flex-wrap gap-2">
-        {#if displayJob?.matchScore}
+        {#if displayJob?.matchScore != null}
           <div
             class="bg-[var(--bg-base)] border border-[var(--border-subtle)] px-3 py-1.5 rounded-md text-xs font-medium text-[var(--success)]"
           >

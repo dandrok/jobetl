@@ -70,7 +70,7 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
           Telemetry.recordScrapeValidationFailure(
             this.source,
             debugUrl,
-            new Error("Missing required title or company from DOM") as any
+            new Error("Missing required title or company from DOM")
           );
         }
         return;

@@ -182,7 +182,7 @@ export class SQLiteJobRepository {
   }
 
   upsertStoredJob(job: StoredJob): void {
-    const setClause: any = {
+    const setClause: Partial<typeof jobsTable.$inferInsert> = {
       source: job.source,
       url: job.url,
       title: job.title,
@@ -201,7 +201,7 @@ export class SQLiteJobRepository {
     if (typeof job.isApplied === "boolean") {
       setClause.isApplied = job.isApplied ? 1 : 0;
     }
-    if (typeof job.postedAt === "string") {
+    if (typeof job.postedAt === "string" || job.postedAt === null) {
       setClause.postedAt = job.postedAt;
     }
 

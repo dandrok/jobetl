@@ -22,6 +22,9 @@ export function focusTrap(node: HTMLElement) {
     if (focusableElements.length > 0) {
       firstFocusable = focusableElements[0];
       lastFocusable = focusableElements[focusableElements.length - 1];
+    } else {
+      firstFocusable = null;
+      lastFocusable = null;
     }
   }
 
@@ -51,7 +54,7 @@ export function focusTrap(node: HTMLElement) {
   node.addEventListener("keydown", handleKeydown);
 
   // Auto-focus first element slightly after mount to ensure rendering is complete
-  setTimeout(() => {
+  const timeoutId = setTimeout(() => {
     updateFocusableElements();
     if (firstFocusable) firstFocusable.focus();
     else node.focus();
@@ -59,6 +62,7 @@ export function focusTrap(node: HTMLElement) {
 
   return {
     destroy() {
+      clearTimeout(timeoutId);
       node.removeEventListener("keydown", handleKeydown);
     }
   };

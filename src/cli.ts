@@ -12,19 +12,21 @@ import { startServer } from "./server";
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const command = args[0] || "scrape";
+  const isOptionFlag = args[0] && args[0].startsWith("-");
+  const command = isOptionFlag ? "scrape" : args[0] || "scrape";
+  const scrapeArgs = isOptionFlag ? args : args.slice(1);
 
   if (command === "scrape") {
     const progress = new OraProgressReporter();
     try {
-      const options = parseCliOptions(args.slice(1));
+      const options = parseCliOptions(scrapeArgs);
       const summary = await runPipeline(config, progress, undefined, options);
       progress.succeed(
         `Done: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
       );
       console.log(JSON.stringify(summary, null, 2));
-    } catch (e: any) {
-      progress.fail(e.message || String(e));
+    } catch (e: unknown) {
+      progress.fail(e instanceof Error ? e.message : String(e));
       process.exitCode = 1;
     }
   } else if (command === "sync-notion") {
@@ -38,8 +40,8 @@ async function main(): Promise<void> {
       );
       console.log(JSON.stringify(summary, null, 2));
       if (summary.failed > 0) process.exitCode = 1;
-    } catch (e: any) {
-      progress.fail(e.message || String(e));
+    } catch (e: unknown) {
+      progress.fail(e instanceof Error ? e.message : String(e));
       process.exitCode = 1;
     }
   } else if (command === "import-notion") {
@@ -49,8 +51,8 @@ async function main(): Promise<void> {
       const summary = await importJobsFromNotion(repository, client);
       console.log(JSON.stringify(summary, null, 2));
       if (summary.failed > 0) process.exitCode = 1;
-    } catch (e: any) {
-      console.error(e.message || String(e));
+    } catch (e: unknown) {
+      console.error(e instanceof Error ? e.message : String(e));
       process.exitCode = 1;
     }
   } else if (command === "report") {

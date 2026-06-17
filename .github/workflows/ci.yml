@@ -33,3 +33,6 @@ jobs:
 
       - name: Run unit tests
         run: npm run test
+
+      - name: Verify UI build
+        run: npm run build:ui

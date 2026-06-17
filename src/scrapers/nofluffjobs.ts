@@ -70,15 +70,7 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
         $(element).find("h4").first().nextAll("div, span").first().text()
       );
 
-      if (!href || !title || !company) {
-        if (href) {
-          const debugUrl = new URL(href, baseUrl).toString();
-          Telemetry.recordScrapeValidationFailure(
-            this.source,
-            debugUrl,
-            new Error("Missing required title or company from DOM") as any
-          );
-        }
+      if (!href) {
         return;
       }
 

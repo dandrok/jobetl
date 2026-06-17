@@ -7,7 +7,7 @@ export function startServer() {
 
   const server = createServer((req, res) => {
     // Add basic CORS headers for local development if Vite is running on a different port
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
     res.setHeader("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -17,7 +17,7 @@ export function startServer() {
       return;
     }
 
-    if (req.url === "/api/jobs") {
+    if (req.url === "/api/jobs" && req.method === "GET") {
       res.writeHead(200, { "Content-Type": "application/json" });
       const jobs = repository
         .listJobs()

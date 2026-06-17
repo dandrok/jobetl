@@ -51,8 +51,11 @@ function isIgnorableText(value: string): boolean {
   return LEAD_BADGES.has(value) || META_TEXTS.has(value) || isTimeText(value);
 }
 
-function extractLeafTexts($: cheerio.CheerioAPI, element: unknown): string[] {
-  const texts = $(element as any)
+function extractLeafTexts(
+  $: cheerio.CheerioAPI,
+  element: cheerio.AnyNode | cheerio.Cheerio<cheerio.AnyNode>
+): string[] {
+  const texts = $(element)
     .find("*")
     .map((__, child) => {
       const tagName = child.tagName?.toLowerCase();
@@ -199,7 +202,7 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
           Telemetry.recordScrapeValidationFailure(
             this.source,
             url,
-            new Error("Missing required title or company from DOM") as any
+            new Error("Missing required title or company from DOM")
           );
         }
         return;

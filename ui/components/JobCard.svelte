@@ -38,12 +38,12 @@
 >
   <!-- Score -->
   <div
-    class="absolute top-5 right-5 bg-[var(--bg-base)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] md:static md:bg-transparent md:px-0 md:py-0 md:border-none font-mono text-[0.95rem] text-[var(--text-secondary)] {job.matchScore &&
-    job.matchScore >= 0.78
+    class="absolute top-5 right-5 bg-[var(--bg-base)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] md:static md:bg-transparent md:px-0 md:py-0 md:border-none font-mono text-[0.95rem] text-[var(--text-secondary)] {job.matchScore !=
+      null && job.matchScore >= 0.78
       ? 'text-[var(--success)] font-semibold'
       : ''} min-w-0"
   >
-    {job.matchScore ? `${Math.round(job.matchScore * 100)}%` : "N/A"}
+    {job.matchScore != null ? `${Math.round(job.matchScore * 100)}%` : "N/A"}
   </div>
 
   <!-- Main Info -->
