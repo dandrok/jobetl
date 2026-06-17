@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseCliOptions } from "../src/cli-options.js";
+import { parseCliOptions } from "@core/cli-options";
 
 describe("parseCliOptions", () => {
   test("returns an empty options object when no arguments are provided", () => {

@@ -1,4 +1,4 @@
-import type { JobListing, JobSource, SourceConfigFor } from "../types.js";
+import type { JobListing, JobSource, SourceConfigFor } from "@core/types";
 
 export interface SourceAdapter<T extends JobSource = JobSource> {
   readonly source: T;

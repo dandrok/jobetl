@@ -1,6 +1,6 @@
-import type { StoredJob } from "../types.js";
-import { buildNotionJobProperties, type NotionPageProperties } from "./mapper.js";
-import type { NotionJobDatabaseSchema } from "./schema.js";
+import type { StoredJob } from "@core/types";
+import { buildNotionJobProperties, type NotionPageProperties } from "@notion/mapper";
+import type { NotionJobDatabaseSchema } from "@notion/schema";
 
 export interface StoredJobReader {
   listJobs(): StoredJob[];

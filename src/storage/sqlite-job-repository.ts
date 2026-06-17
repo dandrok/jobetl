@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import type { JobListing, MatchCandidate, StoredJob } from "../types.js";
+import type { JobListing, MatchCandidate, StoredJob } from "@core/types";
 
 interface JobRow {
   external_id: string;

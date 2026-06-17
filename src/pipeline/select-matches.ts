@@ -1,4 +1,4 @@
-import type { MatchCandidate } from "../types.js";
+import type { MatchCandidate } from "@core/types";
 
 export function selectMatches(candidates: MatchCandidate[], threshold: number): MatchCandidate[] {
   return candidates.filter(

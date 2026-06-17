@@ -1,14 +1,14 @@
 import { readFile } from "node:fs/promises";
 
-import { loadRuntimeEnv } from "../env.js";
-import { JinaReaderClient } from "../jina/client.js";
-import { DeepSeekMatcher } from "../matching/deepseek-matcher.js";
-import type { ProgressReporter } from "../progress/ora-progress-reporter.js";
-import { createSourceAdapters } from "../sources/index.js";
-import { selectSources } from "../sources/select.js";
-import type { SelectedSource, SourceAdapterMap } from "../sources/types.js";
-import { SQLiteJobRepository } from "../storage/sqlite-job-repository.js";
-import { AsyncQueue } from "./async-queue.js";
+import { loadRuntimeEnv } from "@core/env";
+import { JinaReaderClient } from "@jina/client";
+import { DeepSeekMatcher } from "@matching/deepseek-matcher";
+import type { ProgressReporter } from "@progress/ora-progress-reporter";
+import { createSourceAdapters } from "@scrapers/index";
+import { selectSources } from "@scrapers/select";
+import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
+import { SQLiteJobRepository } from "@storage/sqlite-job-repository";
+import { AsyncQueue } from "@pipeline/async-queue";
 import type {
   JobListing,
   JobOffer,
@@ -18,7 +18,7 @@ import type {
   MatchResult,
   PipelineProgressSnapshot,
   RunConfig
-} from "../types.js";
+} from "@core/types";
 
 export interface RunSummary {
   scanned: number;

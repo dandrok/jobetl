@@ -1,10 +1,22 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "outDir": "dist",
     "rootDir": ".",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@core/*": ["src/core/*"],
+      "@scrapers/*": ["src/scrapers/*"],
+      "@matching/*": ["src/matching/*"],
+      "@notion/*": ["src/notion/*"],
+      "@pipeline/*": ["src/pipeline/*"],
+      "@storage/*": ["src/storage/*"],
+      "@jina/*": ["src/jina/*"],
+      "@progress/*": ["src/progress/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

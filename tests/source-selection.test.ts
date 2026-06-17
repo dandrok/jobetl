@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { selectSources } from "../src/sources/select.js";
-import type { SourceAdapterMap } from "../src/sources/types.js";
-import type { RunConfig } from "../src/types.js";
+import { selectSources } from "@scrapers/select";
+import type { SourceAdapterMap } from "@scrapers/types";
+import type { RunConfig } from "@core/types";
 
 function createConfig(): RunConfig {
   return {

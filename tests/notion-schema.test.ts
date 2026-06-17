@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { buildNotionJobDatabaseSchema } from "../src/notion/schema.js";
+import { buildNotionJobDatabaseSchema } from "@notion/schema";
 
 describe("buildNotionJobDatabaseSchema", () => {
   test("accepts required properties and supported optional kinds", () => {

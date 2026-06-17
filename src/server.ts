@@ -1,32 +1,23 @@
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { config } from "./config.js";
-import { SQLiteJobRepository } from "./storage/sqlite-job-repository.js";
+import { config } from "@core/config";
+import { SQLiteJobRepository } from "@storage/sqlite-job-repository";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-let DASHBOARD_HTML = "";
-try {
-  const rawHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
-  DASHBOARD_HTML = rawHtml.replace(
-    /__MATCH_THRESHOLD__/g,
-    String(Math.round(config.matchThreshold * 100))
-  );
-} catch (e) {
-  console.error("Failed to load dashboard.html:", e);
-  process.exit(1);
-}
-
-function startViewer() {
+export function startServer() {
   const repository = new SQLiteJobRepository(config.databasePath);
 
   const server = createServer((req, res) => {
-    if (req.url === "/") {
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(DASHBOARD_HTML);
-    } else if (req.url === "/api/jobs") {
+    // Add basic CORS headers for local development if Vite is running on a different port
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.url === "/api/jobs") {
       res.writeHead(200, { "Content-Type": "application/json" });
       const jobs = repository
         .listJobs()
@@ -97,5 +88,3 @@ function startViewer() {
     console.log("✨ JobETL Backend API is running at http://localhost:3001");
   });
 }
-
-startViewer();

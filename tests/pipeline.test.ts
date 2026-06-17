@@ -3,13 +3,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { formatPipelineProgressText } from "../src/progress/formatters.js";
-import {
-  runPipeline,
-  type PipelineDependencies,
-  type PipelineRepository
-} from "../src/pipeline/run.js";
-import type { SourceAdapterMap } from "../src/sources/types.js";
+import { formatPipelineProgressText } from "@progress/formatters";
+import { runPipeline, type PipelineDependencies, type PipelineRepository } from "@pipeline/run";
+import type { SourceAdapterMap } from "@scrapers/types";
 import type {
   JobListing,
   JobOffer,
@@ -19,7 +15,7 @@ import type {
   PipelineProgressSnapshot,
   RunConfig,
   StoredJob
-} from "../src/types.js";
+} from "@core/types";
 
 const tempDirs: string[] = [];
 
@@ -899,7 +895,7 @@ describe("runPipeline", () => {
       };
     });
 
-    const { runPipeline: runPipelineWithMockedQueue } = await import("../src/pipeline/run.js");
+    const { runPipeline: runPipelineWithMockedQueue } = await import("@pipeline/run");
 
     await expect(runPipelineWithMockedQueue(config, undefined, dependencies)).rejects.toThrow(
       "fetch worker exploded"

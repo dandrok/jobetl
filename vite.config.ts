@@ -5,7 +5,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [svelte(), tailwindcss()],
-  root: 'src/dashboard',
+  root: 'ui',
   server: {
     port: 3000,
     proxy: {

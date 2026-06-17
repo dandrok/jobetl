@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 
-import type { JobListing, PracujPlSearchFilters, SourceConfig } from "../types.js";
-import type { SourceAdapter } from "./types.js";
+import type { JobListing, PracujPlSearchFilters, SourceConfig } from "@core/types";
+import type { SourceAdapter } from "@scrapers/types";
 
 function cleanText(value?: string): string | undefined {
   const normalized = value?.replace(/\s+/g, " ").trim();

@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 
-import type { JobListing, JustJoinItSearchFilters, SourceConfig } from "../types.js";
-import type { SourceAdapter } from "./types.js";
+import type { JobListing, JustJoinItSearchFilters, SourceConfig } from "@core/types";
+import type { SourceAdapter } from "@scrapers/types";
 
 const JUSTJOINIT_ROOT = "https://justjoin.it";
 const LEAD_BADGES = new Set(["Super offer", "1-click Apply", "New"]);

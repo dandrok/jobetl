@@ -1,6 +1,6 @@
-import { JOB_SOURCES, type JobSource, type JobStatus, type StoredJob } from "../types.js";
-import type { NotionDatabasePage } from "./client.js";
-import type { NotionJobDatabaseSchema } from "./schema.js";
+import { JOB_SOURCES, type JobSource, type JobStatus, type StoredJob } from "@core/types";
+import type { NotionDatabasePage } from "@notion/client";
+import type { NotionJobDatabaseSchema } from "@notion/schema";
 
 type NotionText = {
   type: "text";

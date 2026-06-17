@@ -1,7 +1,7 @@
-import type { StoredJob } from "../types.js";
-import type { NotionPageBatch } from "./client.js";
-import { mapNotionPageToStoredJob } from "./mapper.js";
-import type { NotionJobDatabaseSchema } from "./schema.js";
+import type { StoredJob } from "@core/types";
+import type { NotionPageBatch } from "@notion/client";
+import { mapNotionPageToStoredJob } from "@notion/mapper";
+import type { NotionJobDatabaseSchema } from "@notion/schema";
 
 export interface StoredJobWriter {
   upsertStoredJob(job: StoredJob): void;
