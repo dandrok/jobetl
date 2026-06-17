@@ -2,7 +2,7 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { generateObject } from "ai";
 import { z } from "zod";
 
-import type { JobOffer, MatchResult } from "../types.js";
+import type { JobOffer, MatchResult } from "@core/types";
 
 const matchSchema = z.object({
   score: z.number().min(0).max(1),
@@ -11,7 +11,8 @@ const matchSchema = z.object({
 });
 
 let activeScoreCalls = 0;
-let prevWarnings: any;
+type GlobalWithAiSdk = typeof globalThis & { AI_SDK_LOG_WARNINGS?: boolean };
+let prevWarnings: boolean | undefined;
 
 export class DeepSeekMatcher {
   private readonly provider;
@@ -22,8 +23,8 @@ export class DeepSeekMatcher {
 
   async scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult> {
     if (activeScoreCalls === 0) {
-      prevWarnings = (globalThis as any).AI_SDK_LOG_WARNINGS;
-      (globalThis as any).AI_SDK_LOG_WARNINGS = false;
+      prevWarnings = (globalThis as GlobalWithAiSdk).AI_SDK_LOG_WARNINGS;
+      (globalThis as GlobalWithAiSdk).AI_SDK_LOG_WARNINGS = false;
     }
     activeScoreCalls++;
 
@@ -50,7 +51,7 @@ export class DeepSeekMatcher {
     } finally {
       activeScoreCalls--;
       if (activeScoreCalls === 0) {
-        (globalThis as any).AI_SDK_LOG_WARNINGS = prevWarnings;
+        (globalThis as GlobalWithAiSdk).AI_SDK_LOG_WARNINGS = prevWarnings;
       }
     }
   }

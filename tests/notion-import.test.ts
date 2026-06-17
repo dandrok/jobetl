@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { importJobsFromNotion } from "../src/notion/import.js";
+import { importJobsFromNotion } from "@notion/import";
 
 describe("importJobsFromNotion", () => {
   test("hydrates paginated pages into SQLite-style rows and skips malformed pages", async () => {

@@ -1,7 +1,9 @@
 import * as cheerio from "cheerio";
 
-import type { JobListing, PracujPlSearchFilters, SourceConfig } from "../types.js";
-import type { SourceAdapter } from "./types.js";
+import type { JobListing, PracujPlSearchFilters, SourceConfig } from "@core/types";
+import { JobListingSchema } from "@core/types";
+import { Telemetry } from "@core/telemetry";
+import type { SourceAdapter } from "@scrapers/types";
 
 function cleanText(value?: string): string | undefined {
   const normalized = value?.replace(/\s+/g, " ").trim();
@@ -62,21 +64,36 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
       const salaryTextRaw = spans.find((text) => /PLN|zł/i.test(text) && /\d/.test(text));
       const salaryText = cleanText(salaryTextRaw);
 
-      if (!title || !company) return;
+      if (!href || !title || !company) {
+        if (href) {
+          const debugUrl = new URL(href, baseUrl).toString();
+          Telemetry.recordScrapeValidationFailure(
+            this.source,
+            debugUrl,
+            new Error("Missing required title or company from DOM")
+          );
+        }
+        return;
+      }
 
       const url = new URL(href, baseUrl).toString();
       const externalId = `${this.source}:${new URL(url).pathname}`;
 
-      if (!offers.has(externalId)) {
-        offers.set(externalId, {
-          externalId,
-          source: this.source,
-          url,
-          title,
-          company,
-          salaryText,
-          location
-        });
+      const rawOffer = {
+        externalId,
+        source: this.source,
+        url,
+        title,
+        company,
+        salaryText,
+        location
+      };
+
+      const result = JobListingSchema.safeParse(rawOffer);
+      if (result.success) {
+        offers.set(externalId, result.data);
+      } else {
+        Telemetry.recordScrapeValidationFailure(this.source, url, result.error);
       }
     });
 
@@ -110,6 +127,9 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
       }
     }
 
+    if (offers.length === 0) {
+      Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
+    }
     const finalOffers = offers.slice(0, config.maxListings);
     const scrapeTime = Date.now();
 

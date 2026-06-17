@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test, vi } from "vitest";
 
-import { BulldogjobAdapter } from "../src/sources/bulldogjob.js";
-import { JustJoinItAdapter } from "../src/sources/justjoinit.js";
-import { NoFluffJobsAdapter } from "../src/sources/nofluffjobs.js";
+import { BulldogjobAdapter } from "@scrapers/bulldogjob";
+import { JustJoinItAdapter } from "@scrapers/justjoinit";
+import { NoFluffJobsAdapter } from "@scrapers/nofluffjobs";
 
 describe("JustJoinItAdapter", () => {
   test("limits discovery to the configured maxListings", async () => {

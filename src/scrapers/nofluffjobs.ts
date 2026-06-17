@@ -1,7 +1,9 @@
 import * as cheerio from "cheerio";
 
-import type { JobListing, NoFluffJobsSearchFilters, SourceConfig } from "../types.js";
-import type { SourceAdapter } from "./types.js";
+import type { JobListing, NoFluffJobsSearchFilters, SourceConfig } from "@core/types";
+import { JobListingSchema } from "@core/types";
+import { Telemetry } from "@core/telemetry";
+import type { SourceAdapter } from "@scrapers/types";
 
 function cleanText(value?: string): string | undefined {
   const normalized = value?.replace(/\s+/g, " ").trim();
@@ -68,14 +70,14 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
         $(element).find("h4").first().nextAll("div, span").first().text()
       );
 
-      if (!href || !title || !company) {
+      if (!href) {
         return;
       }
 
       const url = new URL(href, baseUrl).toString();
       const externalId = `${this.source}:${new URL(url).pathname}`;
 
-      offers.set(externalId, {
+      const rawOffer = {
         externalId,
         source: this.source,
         url,
@@ -83,7 +85,14 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
         company,
         salaryText: salaryText ? normalizeSalaryText(salaryText) : undefined,
         location
-      });
+      };
+
+      const result = JobListingSchema.safeParse(rawOffer);
+      if (result.success) {
+        offers.set(externalId, result.data);
+      } else {
+        Telemetry.recordScrapeValidationFailure(this.source, url, result.error);
+      }
     });
 
     return [...offers.values()];
@@ -111,6 +120,9 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
       }
     }
 
+    if (offers.length === 0) {
+      Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
+    }
     const finalOffers = offers.slice(0, config.maxListings);
     const scrapeTime = Date.now();
 

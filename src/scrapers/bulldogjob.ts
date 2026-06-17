@@ -1,7 +1,9 @@
 import * as cheerio from "cheerio";
 
-import type { BulldogjobSearchFilters, JobListing, SourceConfig } from "../types.js";
-import type { SourceAdapter } from "./types.js";
+import type { BulldogjobSearchFilters, JobListing, SourceConfig } from "@core/types";
+import { JobListingSchema } from "@core/types";
+import { Telemetry } from "@core/telemetry";
+import type { SourceAdapter } from "@scrapers/types";
 
 function cleanText(value?: string): string | undefined {
   const normalized = value?.replace(/\s+/g, " ").trim();
@@ -55,21 +57,38 @@ export class BulldogjobAdapter implements SourceAdapter<"bulldogjob"> {
         cleanText($(element).find("img[alt]").first().attr("alt")) ??
         cleanText(titleBlock.find("div").first().text());
       const location = cleanText(titleBlock.next().find("div").first().text());
+      const salaryText = cleanText(titleBlock.next().next().find("div").first().text());
 
-      if (!title || !company) {
+      if (!href || !title || !company) {
+        if (href) {
+          const debugUrl = new URL(href, baseUrl).toString();
+          Telemetry.recordScrapeValidationFailure(
+            this.source,
+            debugUrl,
+            new Error("Missing required title or company from DOM")
+          );
+        }
         return;
       }
 
       const externalId = `${this.source}:${pathname}`;
 
-      offers.set(externalId, {
+      const rawOffer = {
         externalId,
         source: this.source,
         url,
         title,
         company,
+        salaryText,
         location
-      });
+      };
+
+      const result = JobListingSchema.safeParse(rawOffer);
+      if (result.success) {
+        offers.set(externalId, result.data);
+      } else {
+        Telemetry.recordScrapeValidationFailure(this.source, url, result.error);
+      }
     });
 
     return [...offers.values()];
@@ -93,6 +112,9 @@ export class BulldogjobAdapter implements SourceAdapter<"bulldogjob"> {
       offers.push(...pageOffers);
     }
 
+    if (offers.length === 0) {
+      Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
+    }
     return offers.slice(0, config.maxListings);
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { buildNotionJobProperties, mapNotionPageToStoredJob } from "../src/notion/mapper.js";
-import type { StoredJob } from "../src/types.js";
+import { buildNotionJobProperties, mapNotionPageToStoredJob } from "@notion/mapper";
+import type { StoredJob } from "@core/types";
 
 const job: StoredJob = {
   externalId: "justjoinit:/job-offer/acme",

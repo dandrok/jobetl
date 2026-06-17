@@ -4,8 +4,8 @@ import {
   derivePipelineStage,
   formatPipelineProgressText,
   formatRunStartText
-} from "../src/progress/formatters.js";
-import type { PipelineProgressSnapshot } from "../src/types.js";
+} from "@progress/formatters";
+import type { PipelineProgressSnapshot } from "@core/types";
 
 afterEach(() => {
   vi.doUnmock("ora");
@@ -116,7 +116,7 @@ describe("progress formatters", () => {
       default: ora
     }));
 
-    const { OraProgressReporter } = await import("../src/progress/ora-progress-reporter.js");
+    const { OraProgressReporter } = await import("@progress/ora-progress-reporter");
 
     const reporter = new OraProgressReporter();
     const startSnapshot = createSnapshot({

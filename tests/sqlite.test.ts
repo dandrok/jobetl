@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { SQLiteJobRepository } from "../src/storage/sqlite-job-repository.js";
-import type { MatchCandidate } from "../src/types.js";
+import { SQLiteJobRepository } from "@storage/sqlite-job-repository";
+import type { MatchCandidate } from "@core/types";
 
 const tempDirs: string[] = [];
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { NotionDatabaseClient } from "../src/notion/client.js";
+import { NotionDatabaseClient } from "@notion/client";
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {

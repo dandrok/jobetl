@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { formatNotionSyncProgressText } from "../src/notion/formatters.js";
-import type { NotionSyncProgressSnapshot } from "../src/notion/sync.js";
+import { formatNotionSyncProgressText } from "@notion/formatters";
+import type { NotionSyncProgressSnapshot } from "@notion/sync";
 
 afterEach(() => {
   vi.doUnmock("ora");
@@ -42,8 +42,7 @@ describe("notion sync progress", () => {
       default: ora
     }));
 
-    const { OraNotionSyncProgressReporter } =
-      await import("../src/notion/ora-progress-reporter.js");
+    const { OraNotionSyncProgressReporter } = await import("@notion/ora-progress-reporter");
 
     const reporter = new OraNotionSyncProgressReporter();
     const startSnapshot = createSnapshot({

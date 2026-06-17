@@ -1,11 +1,11 @@
-import type { NotionSyncEnv } from "../types.js";
-import type { NotionPageProperties } from "./mapper.js";
+import type { NotionSyncEnv } from "@core/types";
+import type { NotionPageProperties } from "@notion/mapper";
 import {
   buildNotionJobDatabaseSchema,
   type NotionDatabaseShape,
   type NotionJobDatabaseSchema
-} from "./schema.js";
-import type { ExistingNotionJob, NotionSyncClient } from "./sync.js";
+} from "@notion/schema";
+import type { ExistingNotionJob, NotionSyncClient } from "@notion/sync";
 
 const NOTION_API_BASE_URL = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";

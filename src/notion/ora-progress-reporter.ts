@@ -1,7 +1,7 @@
 import ora, { type Ora } from "ora";
 
-import { formatNotionSyncProgressText } from "./formatters.js";
-import type { NotionSyncProgressSnapshot } from "./sync.js";
+import { formatNotionSyncProgressText } from "@notion/formatters";
+import type { NotionSyncProgressSnapshot } from "@notion/sync";
 
 export class OraNotionSyncProgressReporter {
   private readonly spinner: Ora;

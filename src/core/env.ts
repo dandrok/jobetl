@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-import type { NotionSyncEnv, RuntimeEnv } from "./types.js";
+import type { NotionSyncEnv, RuntimeEnv } from "@core/types";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

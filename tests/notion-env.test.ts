@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 
-import { loadNotionSyncEnv } from "../src/env.js";
+import { loadNotionSyncEnv } from "@core/env";
 
 const ORIGINAL_ENV = { ...process.env };
 

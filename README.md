@@ -19,53 +19,69 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`
 - Full-offer extraction: Jina Reader
 - AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
-- Storage: local SQLite (`./data/jobetl.db`)
+- Storage: local SQLite (`./data/jobetl.db`) managed via **Drizzle ORM**
+- UI: Svelte 5 + Vite
 - Optional sync: Notion
 - Automation: GitHub Actions
 
 Current code uses DeepSeek for scoring. No OpenAI key is required.
 
-## Flow
+## How It Works (The Architecture)
+
+JobETL is designed to be fast, resilient, and cheap to run. Instead of building monolithic, brittle scrapers for every job board, the pipeline is split into four distinct layers:
+
+### 1. Discovery & Validation (Cheerio + Zod)
+First, we need to find the job links fast.
+- **Cheerio** is used to rapidly download and parse the HTML search result pages. It is extremely fast and lightweight.
+- **Zod** acts as our structural firewall. Because job boards frequently change their DOM (HTML structure), scrapers break often. Every extracted job listing is immediately passed through a strict Zod schema (`JobListingSchema`). If a job board changes its layout and our scraper misses a title or company, Zod catches it instantly and logs it via our Telemetry system instead of silently corrupting the database.
+
+### 2. Deep Extraction (Jina Reader)
+Once we have a valid list of job URLs, we need the actual job descriptions.
+- **Jina Reader API** (`https://r.jina.ai/`) acts as our universal extractor. 
+- **Why Jina?** We wanted to avoid writing and maintaining 4 separate, heavy, Puppeteer/Playwright scripts just to read the details of an offer. Jina visits the URL for us, bypasses anti-bot protections, strips out all the noisy HTML (ads, navbars, popups), and returns pure, clean Markdown. 
+
+### 3. Intelligence (DeepSeek V4)
+With the clean Markdown in hand, we evaluate the job.
+- **DeepSeek V4 (`deepseek-v4-flash`)** is used via the Vercel AI SDK to score the job's Markdown against your personal `cv.md`. 
+- **Why DeepSeek?** It provides near GPT-4 level intelligence at a fraction of the cost and extreme speed, making it perfect for bulk-scoring hundreds of job listings every day without breaking the bank.
+
+### 4. Storage (SQLite + Drizzle ORM)
+Everything is saved locally so we don't re-process or re-score the same jobs tomorrow.
+- **SQLite** is the local database (`./data/jobetl.db`).
+- **Drizzle ORM** manages the schema and queries. We chose Drizzle because it provides 100% strict TypeScript safety for our SQL queries, eliminating runtime bugs and making the database logic extremely easy to refactor without heavy boilerplate.
+
+---
+
+## The Pipeline Flow
 
 ```mermaid
 flowchart TD
-    subgraph Discovery [1. Discovery Phase]
-        A[Job Boards] -->|Scrape HTML| B[Source Adapters]
-        B -->|Extract Job Links| C[(Local SQLite)]
+    subgraph Discovery [1. Discovery Layer]
+        A[Job Boards] -->|Cheerio HTML Fetch| B[Source Adapters]
+        B -->|Extract DOM Nodes| C{Zod Schema Validation}
+        C -->|Valid| D[(SQLite via Drizzle)]
+        C -->|Invalid| E[Telemetry Monitor]
     end
 
-    subgraph Extraction [2. Content Extraction]
-        C --> D{Already Processed?}
-        D -->|No| F[Jina Reader API]
-        F -->|Clean Markdown| G[Raw Job Content]
+    subgraph Extraction [2. Extraction Layer]
+        D --> F{Is Job Processed?}
+        F -->|No| G[Jina Reader API]
+        G -->|Strips HTML| H[Clean Markdown Offer]
     end
 
-    subgraph Intelligence [3. AI Evaluation]
-        G --> H[Deepseek V4 Flash]
-        H -->|Compare against CV| I{Score >= Threshold?}
-        I -->|Yes| J[Mark as Matched]
-        I -->|No| K[Mark as Rejected]
+    subgraph Intelligence [3. Evaluation Layer]
+        H --> I[DeepSeek V4 Flash]
+        I -->|Compare against cv.md| J{Score >= Threshold?}
+        J -->|Yes| K[Save as 'matched']
+        J -->|No| L[Save as 'rejected']
     end
 
-    subgraph Integration [4. Sync & Dashboard]
-        J --> L[(Notion Database)]
-        K --> L
-        J --> M[Web Dashboard UI]
-        K --> M
+    subgraph Integration [4. Presentation Layer]
+        K --> M[(Notion Database)]
+        L --> M
+        K --> N[Vite/Svelte Dashboard]
     end
 ```
-
-## How Jina Reader Works In This Project
-
-Jina Reader is used only for the full job page, not for listing discovery.
-
-1. Each source adapter fetches listing/search pages directly from the job board.
-2. The adapter extracts lightweight metadata such as title, company, salary, location, and the job URL.
-3. For every job that still needs processing, the app calls `https://r.jina.ai/http://<job-url>` with `JINA_API_KEY`.
-4. Jina Reader visits the original job page and returns a cleaned markdown version of the offer.
-5. That markdown is sent to DeepSeek together with your CV markdown for scoring.
-
-This means the project does not need a custom detail-page scraper for every source. It only needs source-specific listing discovery plus one shared Jina fetch step for full offers.
 
 ## API Keys
 
@@ -125,10 +141,10 @@ Review the best saved matches in the terminal:
 npm run report
 ```
 
-Launch the interactive local Web Dashboard (includes filtering, sorting, and CV sent tracking):
+Launch the interactive Svelte Web Dashboard:
 
 ```bash
-npm run dashboard
+npm run dev:ui
 ```
 
 Optional Notion sync commands:

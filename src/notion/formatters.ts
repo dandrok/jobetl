@@ -1,4 +1,4 @@
-import type { NotionSyncProgressSnapshot } from "./sync.js";
+import type { NotionSyncProgressSnapshot } from "@notion/sync";
 
 export function formatNotionSyncProgressText(snapshot: NotionSyncProgressSnapshot): string {
   return [

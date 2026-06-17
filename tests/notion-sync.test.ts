@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { syncJobsToNotion } from "../src/notion/sync.js";
-import type { StoredJob } from "../src/types.js";
+import { syncJobsToNotion } from "@notion/sync";
+import type { StoredJob } from "@core/types";
 
 const jobs: StoredJob[] = [
   {

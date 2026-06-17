@@ -1,5 +1,5 @@
-import { JOB_SOURCES, type JobSource, type RunConfig } from "../types.js";
-import type { SelectedSource, SourceAdapterMap } from "./types.js";
+import { JOB_SOURCES, type JobSource, type RunConfig } from "@core/types";
+import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
 
 export function selectSources(
   config: RunConfig,

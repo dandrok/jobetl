@@ -1,17 +1,22 @@
+import { z } from "zod";
+
 export const JOB_SOURCES = ["justjoinit", "nofluffjobs", "bulldogjob", "pracujpl"] as const;
 
-export type JobSource = (typeof JOB_SOURCES)[number];
+export const JobSourceSchema = z.enum(JOB_SOURCES);
+export type JobSource = z.infer<typeof JobSourceSchema>;
 
-export interface JobListing {
-  externalId: string;
-  source: JobSource;
-  url: string;
-  title: string;
-  company: string;
-  salaryText?: string;
-  location?: string;
-  discoveredAt?: string;
-}
+export const JobListingSchema = z.object({
+  externalId: z.string().min(1, "externalId cannot be empty"),
+  source: JobSourceSchema,
+  url: z.string().url("Must be a valid URL"),
+  title: z.string().min(2, "title is too short"),
+  company: z.string().min(1, "company cannot be empty"),
+  salaryText: z.string().min(1).optional(),
+  location: z.string().min(1).optional(),
+  discoveredAt: z.string().datetime().optional()
+});
+
+export type JobListing = z.infer<typeof JobListingSchema>;
 
 export interface JobOffer extends JobListing {
   offerMarkdown: string;

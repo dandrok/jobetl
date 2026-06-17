@@ -1,4 +1,4 @@
-import { JOB_SOURCES, type JobSource } from "./types.js";
+import { JOB_SOURCES, type JobSource } from "@core/types";
 
 export interface CliOptions {
   source?: JobSource;

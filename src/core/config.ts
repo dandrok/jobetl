@@ -1,4 +1,4 @@
-import type { RunConfig } from "./types.js";
+import type { RunConfig } from "@core/types";
 
 export const config: RunConfig = {
   databasePath: "./data/jobetl.db",
