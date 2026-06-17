@@ -18,6 +18,7 @@ interface JobRow {
   summary: string | null;
   status: string;
   is_applied: number;
+  posted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +38,7 @@ function mapRow(row: JobRow): StoredJob {
     summary: row.summary ?? undefined,
     status: row.status as StoredJob["status"],
     isApplied: Boolean(row.is_applied),
+    postedAt: row.posted_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -74,6 +76,10 @@ export class SQLiteJobRepository {
     const hasIsApplied = tableInfo.some((col) => col.name === "is_applied");
     if (!hasIsApplied) {
       this.database.exec("ALTER TABLE jobs ADD COLUMN is_applied INTEGER NOT NULL DEFAULT 0;");
+    }
+    const hasPostedAt = tableInfo.some((col) => col.name === "posted_at");
+    if (!hasPostedAt) {
+      this.database.exec("ALTER TABLE jobs ADD COLUMN posted_at TEXT;");
     }
   }
 
@@ -118,8 +124,10 @@ export class SQLiteJobRepository {
       .run(status, now, externalId);
   }
 
-  upsertDiscoveredJob(job: JobListing): void {
+  upsertDiscoveredJob(listing: JobListing): void {
     const now = new Date().toISOString();
+    const discoveredAt = listing.discoveredAt || now;
+
     this.database
       .prepare(
         `
@@ -147,14 +155,14 @@ export class SQLiteJobRepository {
       `
       )
       .run(
-        job.externalId,
-        job.source,
-        job.url,
-        job.title,
-        job.company,
-        job.salaryText ?? null,
-        job.location ?? null,
-        now,
+        listing.externalId,
+        listing.source,
+        listing.url,
+        listing.title,
+        listing.company,
+        listing.salaryText ?? null,
+        listing.location ?? null,
+        discoveredAt,
         now
       );
   }
@@ -201,10 +209,11 @@ export class SQLiteJobRepository {
 
   upsertStoredJob(job: StoredJob): void {
     const hasIsApplied = typeof job.isApplied === "boolean";
+    const hasPostedAt = typeof job.postedAt === "string";
     const sql = `
       INSERT INTO jobs (
-        external_id, source, url, title, company, salary_text, location, offer_markdown, match_score, match_reason, summary, status, ${hasIsApplied ? "is_applied, " : ""}created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasIsApplied ? "?, " : ""}?, ?)
+        external_id, source, url, title, company, salary_text, location, offer_markdown, match_score, match_reason, summary, status, ${hasIsApplied ? "is_applied, " : ""}${hasPostedAt ? "posted_at, " : ""}created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${hasIsApplied ? "?, " : ""}${hasPostedAt ? "?, " : ""}?, ?)
       ON CONFLICT(external_id) DO UPDATE SET
         source = excluded.source,
         url = excluded.url,
@@ -218,6 +227,7 @@ export class SQLiteJobRepository {
         summary = excluded.summary,
         status = excluded.status,
         ${hasIsApplied ? "is_applied = excluded.is_applied," : ""}
+        ${hasPostedAt ? "posted_at = excluded.posted_at," : ""}
         created_at = excluded.created_at,
         updated_at = excluded.updated_at
     `;
@@ -239,6 +249,9 @@ export class SQLiteJobRepository {
 
     if (hasIsApplied) {
       params.push(job.isApplied ? 1 : 0);
+    }
+    if (typeof job.postedAt === "string") {
+      params.push(job.postedAt);
     }
 
     params.push(job.createdAt, job.updatedAt);

@@ -236,6 +236,7 @@ export async function runPipeline(
         dependencies.repository.markJobFetching(listing.externalId);
         const offerMarkdown = await dependencies.fetchOfferMarkdown(listing.url);
         dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+
         summary.fetched += 1;
         snapshot.fetching -= 1;
         activeFetchCompanies.delete(listing.externalId);

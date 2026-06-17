@@ -10,6 +10,7 @@ export interface JobListing {
   company: string;
   salaryText?: string;
   location?: string;
+  discoveredAt?: string;
 }
 
 export interface JobOffer extends JobListing {
@@ -69,6 +70,7 @@ export interface StoredJob {
   summary?: string;
   status: JobStatus;
   isApplied?: boolean;
+  postedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

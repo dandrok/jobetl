@@ -111,7 +111,13 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
   ): Promise<JobListing[]> {
     const html = await fetchHtml(this.buildSearchUrl(config.filters, config.baseUrl));
 
-    return this.parseListings(html, config.baseUrl).slice(0, config.maxListings);
+    const finalOffers = this.parseListings(html, config.baseUrl).slice(0, config.maxListings);
+    const scrapeTime = Date.now();
+
+    return finalOffers.map((offer, index) => ({
+      ...offer,
+      discoveredAt: new Date(scrapeTime - index * 1000).toISOString()
+    }));
   }
 
   parseListings(html: string, baseUrl = JUSTJOINIT_ROOT): JobListing[] {
