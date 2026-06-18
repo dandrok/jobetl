@@ -22,9 +22,9 @@
 </script>
 
 <div
-  class="flex flex-col gap-3 relative p-5 bg-[var(--bg-surface)] md:bg-transparent rounded-2xl md:rounded-none md:grid md:grid-cols-[80px_3fr_2fr_1fr] md:p-5 md:px-6 border border-[var(--border-subtle)] md:border-0 md:border-b mb-4 md:mb-0 items-start md:items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors duration-200 w-full text-left outline-none shadow-sm md:shadow-none {job.isApplied
-    ? 'bg-[var(--accent-light)] opacity-85'
-    : ''}"
+  class="flex flex-col gap-3 relative p-5 rounded-2xl md:rounded-none md:grid md:grid-cols-[80px_3fr_2fr_1fr] md:p-5 md:px-6 border border-[var(--border-subtle)] md:border-0 md:border-b mb-4 md:mb-0 items-start md:items-center cursor-pointer hover:bg-[var(--bg-hover)] transition-colors duration-200 w-full text-left outline-none shadow-sm md:shadow-none {job.isApplied
+    ? 'bg-[var(--accent-light)] md:bg-[var(--accent-light)] opacity-85'
+    : 'bg-[var(--bg-surface)] md:bg-transparent'}"
   role="button"
   tabindex="0"
   aria-label="View details for {job.title} at {job.company}"
@@ -36,6 +36,12 @@
     }
   }}
 >
+  {#if job.isApplied}
+    <div
+      class="absolute left-0 top-0 bottom-0 w-[4px] bg-[var(--accent)] rounded-l-2xl md:rounded-none"
+    ></div>
+  {/if}
+
   <!-- Score -->
   <div
     class="absolute top-5 right-5 bg-[var(--bg-base)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] md:static md:bg-transparent md:px-0 md:py-0 md:border-none font-mono text-[0.95rem] text-[var(--text-secondary)] {job.matchScore !=
@@ -53,6 +59,12 @@
         class="text-xs font-semibold px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[var(--text-secondary)] tracking-wide border border-[var(--border-subtle)] truncate"
         >{job.source}</span
       >
+      {#if job.isApplied}
+        <span
+          class="text-[0.65rem] font-bold px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--bg-base)] tracking-wider uppercase shrink-0"
+          >Applied</span
+        >
+      {/if}
       {#if isNew}
         <span
           class="text-[0.65rem] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-light)] text-[var(--accent)] tracking-wider uppercase shrink-0"
