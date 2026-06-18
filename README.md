@@ -64,22 +64,22 @@ flowchart TD
     end
 
     subgraph Extraction [2. Extraction Layer]
-        D --> F{Is Job Processed?}
-        F -->|No| G[Jina Reader API]
-        G -->|Strips HTML| H[Clean Markdown Offer]
+        D -->|Fetch Pending| F[Jina Reader API]
+        F -->|Clean Markdown Offer| G[Clean Markdown]
     end
 
     subgraph Intelligence [3. Evaluation Layer]
-        H --> I[DeepSeek V4 Flash]
-        I -->|Compare against cv.md| J{Score >= Threshold?}
-        J -->|Yes| K[Save as 'matched']
-        J -->|No| L[Save as 'rejected']
+        G --> H[DeepSeek V4 Flash]
+        H -->|Compare against cv.md| I{Score >= Threshold?}
+        I -->|Yes| J[Save as 'matched']
+        I -->|No| K[Save as 'rejected']
+        J -->|Write Status| D
+        K -->|Write Status| D
     end
 
-    subgraph Integration [4. Presentation Layer]
-        K --> M[(Notion Database)]
-        L --> M
-        K --> N[Vite/Svelte Dashboard]
+    subgraph Presentation [4. Presentation Layer]
+        D -->|Bidirectional Sync| L[(Notion Database)]
+        D -->|Local API Queries| M[Vite/Svelte Dashboard]
     end
 ```
 
