@@ -31,15 +31,15 @@
   <div
     use:focusTrap
     tabindex="-1"
-    class="fixed top-0 right-0 w-[650px] max-w-[100vw] h-screen bg-[var(--bg-base)] shadow-[-20px_0_50px_rgba(0,0,0,0.3)] z-[1000] flex flex-col border-l border-[var(--border-subtle)] transform-gpu outline-none"
+    class="fixed top-0 right-0 w-[650px] max-w-[100vw] h-screen bg-(--bg-base) shadow-[-20px_0_50px_rgba(0,0,0,0.3)] z-[1000] flex flex-col border-l border-(--border-subtle) transform-gpu outline-none"
     role="dialog"
     aria-modal="true"
     aria-labelledby="drawTitle"
     transition:fly={{ x: "100%", duration: 400, easing: cubicOut }}
   >
-    <div class="p-8 lg:p-10 border-b border-[var(--border-subtle)] relative bg-[var(--bg-surface)]">
+    <div class="p-8 lg:p-10 border-b border-(--border-subtle) relative bg-(--bg-surface)">
       <button
-        class="absolute top-6 right-6 bg-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-secondary)] p-2.5 rounded-lg hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors duration-200 flex items-center justify-center cursor-pointer"
+        class="absolute top-6 right-6 bg-(--bg-base) border border-(--border-subtle) text-(--text-secondary) p-2.5 rounded-lg hover:text-(--text-primary) hover:border-(--text-primary) transition-colors duration-200 flex items-center justify-center cursor-pointer"
         onclick={onClose}
         aria-label="Close details panel"
       >
@@ -55,13 +55,11 @@
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
-      <div
-        class="text-[0.95rem] font-medium uppercase tracking-wider text-[var(--text-tertiary)] mb-3"
-      >
+      <div class="text-[0.95rem] font-medium uppercase tracking-wider text-(--text-tertiary) mb-3">
         {displayJob?.company}
       </div>
       <h2
-        class="font-serif text-3xl lg:text-4xl text-[var(--text-primary)] mb-6 pr-12 leading-tight tracking-tight"
+        class="font-serif text-3xl lg:text-4xl text-(--text-primary) mb-6 pr-12 leading-tight tracking-tight"
         id="drawTitle"
       >
         {displayJob?.title}
@@ -70,26 +68,26 @@
       <div class="flex flex-wrap gap-2">
         {#if displayJob?.matchScore != null}
           <div
-            class="bg-[var(--bg-base)] border border-[var(--border-subtle)] px-3 py-1.5 rounded-md text-xs font-medium text-[var(--success)]"
+            class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--success)"
           >
             {Math.round(displayJob.matchScore * 100)}%
           </div>
         {/if}
         <div
-          class="bg-[var(--bg-base)] border border-[var(--border-subtle)] px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)]"
+          class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--text-secondary)"
         >
           {displayJob?.source}
         </div>
         {#if displayJob?.location}
           <div
-            class="bg-[var(--bg-base)] border border-[var(--border-subtle)] px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)]"
+            class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--text-secondary)"
           >
             {displayJob.location}
           </div>
         {/if}
         {#if displayJob?.salary}
           <div
-            class="bg-[var(--bg-base)] border border-[var(--border-subtle)] px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)]"
+            class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--text-secondary)"
           >
             {displayJob.salary}
           </div>
@@ -106,18 +104,15 @@
           onchange={(e) => {
             if (displayJob) onToggleApply(displayJob.externalId, e.currentTarget.checked);
           }}
-          class="w-5 h-5 accent-[var(--accent)] cursor-pointer rounded"
+          class="w-5 h-5 accent-(--accent) cursor-pointer rounded"
         />
-        <label
-          for="drawApplied"
-          class="font-medium text-base cursor-pointer text-[var(--text-primary)]"
-        >
+        <label for="drawApplied" class="font-medium text-base cursor-pointer text-(--text-primary)">
           CV Sent / Applied
         </label>
       </div>
 
       <div
-        class="text-xs uppercase tracking-wider text-[var(--text-tertiary)] mb-5 font-semibold flex items-center gap-2"
+        class="text-xs uppercase tracking-wider text-(--text-tertiary) mb-5 font-semibold flex items-center gap-2"
       >
         <svg
           width="14"
@@ -134,7 +129,7 @@
       </div>
 
       <div
-        class="font-serif text-lg leading-relaxed text-[var(--text-primary)] mb-12 whitespace-pre-wrap"
+        class="font-serif text-lg leading-relaxed text-(--text-primary) mb-12 whitespace-pre-wrap"
       >
         {#if displayJob?.matchReason}
           {displayJob.matchReason}
@@ -148,7 +143,7 @@
           href={displayJob.url}
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 bg-[var(--text-primary)] text-[var(--bg-base)] px-6 py-3.5 rounded-lg text-[0.95rem] font-medium hover:opacity-90 transition-opacity duration-200"
+          class="inline-flex items-center gap-2 bg-(--text-primary) text-(--bg-base) px-6 py-3.5 rounded-lg text-[0.95rem] font-medium hover:opacity-90 transition-opacity duration-200"
         >
           View Original Posting
           <svg

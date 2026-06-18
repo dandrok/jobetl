@@ -168,7 +168,7 @@
   }
 </script>
 
-<div class="flex min-h-screen w-full bg-[var(--bg-base)] transition-theme relative">
+<div class="flex min-h-screen w-full bg-(--bg-base) transition-theme relative">
   <Sidebar
     {currentFilter}
     onFilterChange={handleFilterChange}
@@ -180,7 +180,7 @@
     onClose={() => (isSidebarCollapsed = true)}
   />
 
-  <main class="flex-1 flex flex-col min-w-0 relative bg-[var(--bg-base)] w-full">
+  <main class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full">
     <Header
       {currentFilter}
       onFilterChange={(f) => (currentFilter = f)}
@@ -199,11 +199,11 @@
 
       <section
         aria-label="Job Listings"
-        class="bg-transparent md:bg-[var(--bg-surface)] md:border md:border-[var(--border-subtle)] rounded-2xl overflow-visible md:overflow-hidden w-full transition-theme shadow-sm"
+        class="bg-transparent md:bg-(--bg-surface) md:border md:border-(--border-subtle) rounded-2xl overflow-visible md:overflow-hidden w-full transition-theme shadow-sm"
       >
         <!-- Desktop Header -->
         <header
-          class="hidden md:grid grid-cols-[80px_3fr_2fr_1fr] px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[0.75rem] text-[var(--text-tertiary)] font-semibold uppercase tracking-[0.05em] w-full min-w-0"
+          class="hidden md:grid grid-cols-[80px_3fr_2fr_1fr] px-6 py-4 border-b border-(--border-subtle) bg-(--bg-surface) text-[0.75rem] text-(--text-tertiary) font-semibold uppercase tracking-[0.05em] w-full min-w-0"
         >
           <div class="min-w-0">Score</div>
           <div class="min-w-0">Role & Company</div>
@@ -213,19 +213,15 @@
 
         <div class="flex flex-col w-full">
           {#if isLoading}
-            <div
-              class="py-20 px-4 text-center text-[var(--text-tertiary)] font-serif italic text-xl"
-            >
+            <div class="py-20 px-4 text-center text-(--text-tertiary) font-serif italic text-xl">
               Loading intelligence...
             </div>
           {:else if error}
-            <div class="py-20 px-4 text-center text-[var(--danger)] font-serif italic text-xl">
+            <div class="py-20 px-4 text-center text-(--danger) font-serif italic text-xl">
               {error}
             </div>
           {:else if filteredJobs.length === 0}
-            <div
-              class="py-20 px-4 text-center text-[var(--text-tertiary)] font-serif italic text-xl"
-            >
+            <div class="py-20 px-4 text-center text-(--text-tertiary) font-serif italic text-xl">
               No jobs match your criteria.
             </div>
           {:else}

@@ -35,17 +35,17 @@
   <nav
     use:focusTrap
     tabindex="-1"
-    class="fixed top-0 left-0 w-[280px] bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col shrink-0 z-[100] h-screen transform-gpu outline-none"
+    class="fixed top-0 left-0 w-[280px] bg-(--bg-surface) border-r border-(--border-subtle) flex flex-col shrink-0 z-[100] h-screen transform-gpu outline-none"
     transition:fly={{ x: -280, duration: 400, easing: cubicOut }}
   >
     <div class="p-6 flex justify-between items-center">
-      <span class="font-serif text-2xl font-medium text-[var(--text-primary)] tracking-tight"
+      <span class="font-serif text-2xl font-medium text-(--text-primary) tracking-tight"
         >JobETL</span
       >
       <div class="flex gap-1">
         <button
           onclick={onToggleTheme}
-          class="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-active)] transition-colors duration-200"
+          class="w-9 h-9 rounded-lg flex items-center justify-center text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-active) transition-colors duration-200"
           aria-label="Toggle Theme"
         >
           <svg
@@ -78,7 +78,7 @@
         </button>
         <button
           onclick={onClose}
-          class="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-active)] transition-colors duration-200"
+          class="w-9 h-9 rounded-lg flex items-center justify-center text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-active) transition-colors duration-200"
           aria-label="Close Sidebar"
         >
           <svg
@@ -102,7 +102,7 @@
     <div class="p-4 px-6 flex-1 flex flex-col gap-10 overflow-y-auto">
       <div class="flex flex-col gap-1.5">
         <div
-          class="text-[0.75rem] text-[var(--text-tertiary)] mb-3 pl-3 uppercase tracking-[0.05em] font-semibold"
+          class="text-[0.75rem] text-(--text-tertiary) mb-3 pl-3 uppercase tracking-[0.05em] font-semibold"
         >
           Intelligence
         </div>
@@ -110,8 +110,8 @@
         <button
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.95rem] transition-colors duration-200 w-full text-left {currentFilter ===
           'matched'
-            ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium'
-            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}"
+            ? 'bg-(--accent-light) text-(--accent) font-medium'
+            : 'text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)'}"
           onclick={() => onFilterChange("matched")}
         >
           <svg
@@ -128,8 +128,8 @@
         <button
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.95rem] transition-colors duration-200 w-full text-left {currentFilter ===
           'all'
-            ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium'
-            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}"
+            ? 'bg-(--accent-light) text-(--accent) font-medium'
+            : 'text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)'}"
           onclick={() => onFilterChange("all")}
         >
           <svg
@@ -149,8 +149,8 @@
         <button
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.95rem] transition-colors duration-200 w-full text-left {currentFilter ===
           'rejected'
-            ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium'
-            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}"
+            ? 'bg-(--accent-light) text-(--accent) font-medium'
+            : 'text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)'}"
           onclick={() => onFilterChange("rejected")}
         >
           <svg
@@ -169,18 +169,18 @@
 
       <div class="flex flex-col gap-1.5">
         <div
-          class="text-[0.75rem] text-[var(--text-tertiary)] mb-3 pl-3 uppercase tracking-[0.05em] font-semibold"
+          class="text-[0.75rem] text-(--text-tertiary) mb-3 pl-3 uppercase tracking-[0.05em] font-semibold"
         >
           Sources
         </div>
         <div class="flex flex-col gap-1">
           {#each allSources as source}
             <label
-              class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer transition-colors duration-200"
+              class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover) cursor-pointer transition-colors duration-200"
             >
               <input
                 type="checkbox"
-                class="accent-[var(--accent)] w-4 h-4 rounded cursor-pointer"
+                class="accent-(--accent) w-4 h-4 rounded cursor-pointer"
                 checked={selectedSources.has(source)}
                 onchange={() => onToggleSource(source)}
               />

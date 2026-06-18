@@ -27,12 +27,12 @@
 </script>
 
 <header
-  class="sticky top-0 bg-[var(--bg-base)] z-[40] p-4 md:p-6 lg:px-12 flex flex-col md:flex-row justify-between md:items-center border-b border-[var(--border-subtle)] gap-4 md:gap-5 transition-theme"
+  class="sticky top-0 bg-(--bg-base) z-[40] p-4 md:p-6 lg:px-12 flex flex-col md:flex-row justify-between md:items-center border-b border-(--border-subtle) gap-4 md:gap-5 transition-theme"
 >
   <div class="flex items-center gap-4 justify-between md:justify-start w-full md:w-auto shrink-0">
     <div class="flex items-center gap-4">
       <button
-        class="w-10 h-10 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded-lg transition-colors"
+        class="w-10 h-10 flex items-center justify-center text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary) rounded-lg transition-colors"
         onclick={onToggleSidebar}
         aria-label="Toggle Sidebar"
       >
@@ -52,7 +52,7 @@
         >
       </button>
       <h1
-        class="font-serif text-2xl lg:text-4xl text-[var(--text-primary)] tracking-tight whitespace-nowrap"
+        class="font-serif text-2xl lg:text-4xl text-(--text-primary) tracking-tight whitespace-nowrap"
       >
         {getTitle(currentFilter)}
       </h1>
@@ -62,7 +62,7 @@
   <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
     <div class="relative w-full sm:flex-1 md:w-48 lg:w-64">
       <svg
-        class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] w-4 h-4 pointer-events-none"
+        class="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-tertiary) w-4 h-4 pointer-events-none"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -77,7 +77,7 @@
         value={searchQuery}
         oninput={(e) => onSearchChange(e.currentTarget.value)}
         placeholder="Search jobs..."
-        class="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] pl-9 pr-4 py-2.5 rounded-lg text-sm outline-none focus:border-[var(--text-primary)] transition-all duration-200"
+        class="w-full bg-(--bg-surface) border border-(--border-subtle) text-(--text-primary) pl-9 pr-4 py-2.5 rounded-lg text-sm outline-none focus:border-(--text-primary) transition-all duration-200"
       />
     </div>
 
@@ -86,13 +86,13 @@
         aria-label="Sort jobs"
         value={currentSort}
         onchange={(e) => onSortChange(e.currentTarget.value as "score" | "date")}
-        class="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] pl-4 pr-10 py-2.5 rounded-lg text-sm outline-none cursor-pointer appearance-none transition-all duration-200 focus:border-[var(--text-primary)]"
+        class="w-full bg-(--bg-surface) border border-(--border-subtle) text-(--text-primary) pl-4 pr-10 py-2.5 rounded-lg text-sm outline-none cursor-pointer appearance-none transition-all duration-200 focus:border-(--text-primary)"
       >
         <option value="score">Sort by Score</option>
         <option value="date">Sort by Latest</option>
       </select>
       <svg
-        class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-tertiary)]"
+        class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-(--text-tertiary)"
         width="16"
         height="16"
         viewBox="0 0 24 24"
