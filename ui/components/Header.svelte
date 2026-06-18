@@ -1,7 +1,6 @@
 <script lang="ts">
   let {
     currentFilter,
-    onFilterChange,
     currentSort,
     onSortChange,
     searchQuery,
@@ -10,7 +9,6 @@
     isSidebarCollapsed
   } = $props<{
     currentFilter: "matched" | "all" | "rejected";
-    onFilterChange: (f: "matched" | "all" | "rejected") => void;
     currentSort: "score" | "date";
     onSortChange: (s: "score" | "date") => void;
     searchQuery: string;

@@ -1,8 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { flip } from "svelte/animate";
-  import { fly, fade } from "svelte/transition";
-  import { quintOut } from "svelte/easing";
+  import { fade } from "svelte/transition";
   import type { StoredJob } from "./types";
   import JobCard from "./components/JobCard.svelte";
   import Drawer from "./components/Drawer.svelte";
@@ -133,33 +131,21 @@
 
   // Toggle Source
   function toggleSource(source: string) {
-    const update = () => {
-      const newSources = new Set(selectedSources);
-      if (newSources.has(source)) {
-        newSources.delete(source);
-      } else {
-        newSources.add(source);
-      }
-      selectedSources = newSources;
-    };
-
-    // Defer heavy update on mobile to allow sidebar to slide out smoothly
-    if (window.innerWidth <= 1024 && !isSidebarCollapsed) {
-      isSidebarCollapsed = true;
-      setTimeout(update, 300);
+    const newSources = new Set(selectedSources);
+    if (newSources.has(source)) {
+      newSources.delete(source);
     } else {
-      update();
+      newSources.add(source);
     }
+    selectedSources = newSources;
   }
 
   let isSidebarCollapsed = $state(true);
 
   function handleFilterChange(f: "matched" | "all" | "rejected") {
+    currentFilter = f;
     if (window.innerWidth <= 1024) {
       isSidebarCollapsed = true;
-      setTimeout(() => (currentFilter = f), 300);
-    } else {
-      currentFilter = f;
     }
   }
 
@@ -183,7 +169,6 @@
   <main class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full">
     <Header
       {currentFilter}
-      onFilterChange={(f) => (currentFilter = f)}
       {currentSort}
       onSortChange={(s) => (currentSort = s)}
       {searchQuery}
@@ -225,15 +210,13 @@
               No jobs match your criteria.
             </div>
           {:else}
-            {#each filteredJobs as job (job.externalId)}
-              <div
-                animate:flip={{ duration: 400, easing: quintOut }}
-                in:fly={{ y: 20, duration: 300, delay: 150, easing: quintOut }}
-                out:fade={{ duration: 150 }}
-              >
-                <JobCard {job} onToggleApply={toggleApply} onClick={(j) => (selectedJob = j)} />
+            {#key currentFilter}
+              <div in:fade={{ duration: 150 }} class="flex flex-col w-full">
+                {#each filteredJobs as job (job.externalId)}
+                  <JobCard {job} onToggleApply={toggleApply} onClick={(j) => (selectedJob = j)} />
+                {/each}
               </div>
-            {/each}
+            {/key}
           {/if}
         </div>
       </section>
