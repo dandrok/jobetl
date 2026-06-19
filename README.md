@@ -43,8 +43,8 @@ Once we have a valid list of job URLs, we need the actual job descriptions.
 
 ### 3. Intelligence (DeepSeek V4)
 With the clean Markdown in hand, we evaluate the job.
-- **DeepSeek V4 (`deepseek-v4-flash`)** is used via the Vercel AI SDK to score the job's Markdown against your personal `cv.md`. 
-- **Why DeepSeek?** It provides near GPT-4 level intelligence at a fraction of the cost and extreme speed, making it perfect for bulk-scoring hundreds of job listings every day without breaking the bank.
+- **DeepSeek V4 (`deepseek-v4-flash`)** is used via the Vercel AI SDK to score the job descriptions against your personal `cv.md`. 
+- **Why DeepSeek?** DeepSeek V4 Flash provides high-level reasoning and matching intelligence at an extremely low price point. Its superior cost-to-performance ratio and fast response times make it ideal for bulk-scoring hundreds of job descriptions daily without excessive API costs.
 
 ### 4. Storage (SQLite + Drizzle ORM)
 Everything is saved locally so we don't re-process or re-score the same jobs tomorrow.
@@ -72,8 +72,8 @@ flowchart TD
     end
 
     subgraph Intelligence [3. Evaluation Layer]
-        G --> H[DeepSeek V4 Flash]
-        H -->|Compare against cv.md| I{Score >= Threshold?}
+        G --> DS[DeepSeek V4 Flash]
+        DS -->|Compare against cv.md| I{Score >= Threshold?}
         I -->|Yes| J[Save as 'matched']
         I -->|No| K[Save as 'rejected']
         J -->|Write Status| D

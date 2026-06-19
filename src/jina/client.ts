@@ -56,7 +56,8 @@ export class JinaReaderClient {
   private async fetchWithJina(url: string): Promise<string> {
     await this.validateKey();
 
-    const cleanUrl = `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`;
+    const protocol = url.startsWith("https://") ? "https" : "http";
+    const cleanUrl = `https://r.jina.ai/${protocol}://${url.replace(/^https?:\/\//, "")}`;
 
     if (this.useApiKey) {
       try {
@@ -145,7 +146,10 @@ export class JinaReaderClient {
     $("script, style, nav, footer, header, iframe, noscript, svg, path, button").remove();
 
     const bodyText = $("body").text();
-    const cleaned = bodyText.replace(/\s+/g, " ").replace(/\n+/g, "\n").trim();
+    const cleaned = bodyText
+      .replace(/\n+/g, "\n")
+      .replace(/[^\S\r\n]+/g, " ")
+      .trim();
 
     if (!cleaned) {
       throw new Error("Direct HTML parsed text is empty");
