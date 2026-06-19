@@ -2,7 +2,7 @@
 
 JobETL helps you turn job boards into a short list of jobs that actually fit your CV.
 
-It discovers listings from supported sources, fetches each full offer as markdown, scores it against your resume with AI, and stores the result in a local SQLite database. Optional Notion sync lets the same data flow through GitHub Actions.
+It discovers listings from supported sources, fetches each full offer description (using Jina Reader with a local Cheerio HTML-to-text fallback), scores it against your resume with AI, and stores the result in a local SQLite database. Optional Notion sync lets the same data flow through GitHub Actions.
 
 ## The Idea In 30 Seconds
 
@@ -17,7 +17,7 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 
 - Runtime: Node.js + TypeScript
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`
-- Full-offer extraction: Jina Reader
+- Full-offer extraction: Jina Reader (with local Cheerio HTML-to-text fallback)
 - AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
 - Storage: local SQLite (`./data/jobetl.db`) managed via **Drizzle ORM**
 - UI: Svelte 5 + Vite
@@ -35,10 +35,11 @@ First, we need to find the job links fast.
 - **Cheerio** is used to rapidly download and parse the HTML search result pages. It is extremely fast and lightweight.
 - **Zod** acts as our structural firewall. Because job boards frequently change their DOM (HTML structure), scrapers break often. Every extracted job listing is immediately passed through a strict Zod schema (`JobListingSchema`). If a job board changes its layout and our scraper misses a title or company, Zod catches it instantly and logs it via our Telemetry system instead of silently corrupting the database.
 
-### 2. Deep Extraction (Jina Reader)
+### 2. Deep Extraction (Jina Reader & Cheerio Fallback)
 Once we have a valid list of job URLs, we need the actual job descriptions.
 - **Jina Reader API** (`https://r.jina.ai/`) acts as our universal extractor. 
 - **Why Jina?** We wanted to avoid writing and maintaining 4 separate, heavy, Puppeteer/Playwright scripts just to read the details of an offer. Jina visits the URL for us, bypasses anti-bot protections, strips out all the noisy HTML (ads, navbars, popups), and returns pure, clean Markdown. 
+- **Cheerio Fallback:** If Jina Reader is rate-limited (HTTP 429), out of credits (HTTP 402), or offline, the pipeline automatically falls back to fetching the page directly and using a local Cheerio parser to strip layouts/scripts and extract clean job description text. This provides a 100% free and infinite backup mechanism.
 
 ### 3. Intelligence (DeepSeek V4)
 With the clean Markdown in hand, we evaluate the job.
@@ -64,8 +65,10 @@ flowchart TD
     end
 
     subgraph Extraction [2. Extraction Layer]
-        D -->|Fetch Pending| F[Jina Reader API]
-        F -->|Clean Markdown Offer| G[Clean Markdown]
+        D -->|Fetch Pending| F{Jina Reader API?}
+        F -->|Success| G[Markdown Description]
+        F -->|Failure / Limit| H[Local HTML Fetch]
+        H -->|Cheerio Extract| G
     end
 
     subgraph Intelligence [3. Evaluation Layer]
@@ -87,8 +90,11 @@ flowchart TD
 
 Required for the core pipeline:
 
-- `JINA_API_KEY`
 - `DEEPSEEK_API_KEY`
+
+Optional:
+
+- `JINA_API_KEY`: If not configured, or if your key is out of credits/rate-limited, the pipeline automatically falls back to Jina's keyless free-tier and then to the built-in local Cheerio text parser.
 
 Required only if you use Notion sync or the bundled GitHub Actions workflow:
 
