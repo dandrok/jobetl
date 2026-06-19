@@ -142,6 +142,22 @@ function createPipelineDependencies(
   };
 }
 
+function isFatalDeepSeekError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lowerMsg = msg.toLowerCase();
+  return (
+    lowerMsg.includes("401") ||
+    lowerMsg.includes("402") ||
+    lowerMsg.includes("403") ||
+    lowerMsg.includes("unauthorized") ||
+    lowerMsg.includes("payment required") ||
+    lowerMsg.includes("api key") ||
+    lowerMsg.includes("invalid key") ||
+    lowerMsg.includes("insufficient balance") ||
+    lowerMsg.includes("authentication")
+  );
+}
+
 export async function runPipeline(
   config: RunConfig,
   progress?: ProgressReporter,
@@ -244,7 +260,7 @@ export async function runPipeline(
         queuedForScore = true;
         emitSnapshot("update");
         await scoreQueue.enqueue({ ...listing, offerMarkdown });
-      } catch {
+      } catch (error) {
         if (queuedForScore) {
           snapshot.queuedScore -= 1;
         } else {
@@ -256,6 +272,10 @@ export async function runPipeline(
         summary.failed += 1;
         snapshot.failed += 1;
         emitSnapshot("update");
+        console.error(
+          `\nFailed to fetch offer for ${listing.company} (${listing.url}):`,
+          error instanceof Error ? error.message : String(error)
+        );
       }
     }
   }
@@ -296,13 +316,24 @@ export async function runPipeline(
           snapshot.rejected += 1;
         }
         emitSnapshot("update");
-      } catch {
+      } catch (error) {
         snapshot.scoring -= 1;
         activeScoreCompanies.delete(offer.externalId);
         dependencies.repository.markJobError(offer.externalId);
         summary.failed += 1;
         snapshot.failed += 1;
         emitSnapshot("update");
+        console.error(
+          `\nFailed to score offer for ${offer.company} (${offer.url}):`,
+          error instanceof Error ? error.message : String(error)
+        );
+
+        if (isFatalDeepSeekError(error)) {
+          throw new Error(
+            `Fatal DeepSeek API Error: ${error instanceof Error ? error.message : String(error)}. Aborting pipeline.`,
+            { cause: error }
+          );
+        }
       }
     }
   }

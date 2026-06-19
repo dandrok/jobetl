@@ -13,7 +13,7 @@ function requireEnv(name: string): string {
 
 export function loadRuntimeEnv(): RuntimeEnv {
   return {
-    jinaApiKey: requireEnv("JINA_API_KEY"),
+    jinaApiKey: process.env.JINA_API_KEY || "",
     deepseekApiKey: requireEnv("DEEPSEEK_API_KEY")
   };
 }
