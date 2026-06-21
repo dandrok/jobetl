@@ -51,8 +51,19 @@ export function startServer() {
           if (tooLarge) return;
           try {
             const data = JSON.parse(body);
+            let updated = false;
+            let handled = false;
+
             if (typeof data.isApplied === "boolean") {
-              const updated = repository.updateJobAppliedStatus(id, data.isApplied);
+              updated = repository.updateJobAppliedStatus(id, data.isApplied);
+              handled = true;
+            }
+            if (typeof data.isNotInterested === "boolean") {
+              updated = repository.updateJobInterestedStatus(id, data.isNotInterested);
+              handled = true;
+            }
+
+            if (handled) {
               if (updated) {
                 res.writeHead(200, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ success: true }));

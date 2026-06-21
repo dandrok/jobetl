@@ -291,4 +291,43 @@ describe("SQLiteJobRepository", () => {
       })
     ]);
   });
+
+  test("updates applied and interested status properly", () => {
+    const repository = createRepository();
+    const externalId = "justjoinit:/job-offer/acme";
+
+    repository.upsertStoredJob({
+      externalId,
+      source: "justjoinit",
+      url: "https://justjoin.it/job-offer/acme",
+      title: "Senior Node Engineer",
+      company: "Acme",
+      status: "matched",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z"
+    });
+
+    // default values
+    let job = repository.listJobs()[0];
+    expect(job.isApplied).toBe(false);
+    expect(job.isNotInterested).toBe(false);
+    expect(job.appliedAt).toBeUndefined();
+
+    // mark as applied
+    repository.updateJobAppliedStatus(externalId, true);
+    job = repository.listJobs()[0];
+    expect(job.isApplied).toBe(true);
+    expect(job.appliedAt).toBeTypeOf("string");
+
+    // mark as not interested
+    repository.updateJobInterestedStatus(externalId, true);
+    job = repository.listJobs()[0];
+    expect(job.isNotInterested).toBe(true);
+
+    // mark as not applied
+    repository.updateJobAppliedStatus(externalId, false);
+    job = repository.listJobs()[0];
+    expect(job.isApplied).toBe(false);
+    expect(job.appliedAt).toBeUndefined();
+  });
 });

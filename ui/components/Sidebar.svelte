@@ -11,7 +11,11 @@
     onToggleSource,
     onToggleTheme,
     isCollapsed,
-    onClose
+    onClose,
+    appliedFilter,
+    onAppliedFilterChange,
+    notInterestedFilter,
+    onNotInterestedFilterChange
   } = $props<{
     currentFilter: "matched" | "all" | "rejected";
     onFilterChange: (f: "matched" | "all" | "rejected") => void;
@@ -21,6 +25,10 @@
     onToggleTheme: () => void;
     isCollapsed: boolean;
     onClose: () => void;
+    appliedFilter: "all" | "only" | "hide";
+    onAppliedFilterChange: (f: "all" | "only" | "hide") => void;
+    notInterestedFilter: "all" | "only" | "hide";
+    onNotInterestedFilterChange: (f: "all" | "only" | "hide") => void;
   }>();
 </script>
 
@@ -165,6 +173,82 @@
           >
           Rejected
         </button>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <div
+          class="text-[0.75rem] text-(--text-tertiary) mb-3 pl-3 uppercase tracking-[0.05em] font-semibold"
+        >
+          Status Filters
+        </div>
+
+        <div class="flex flex-col gap-1 px-3">
+          <span class="text-xs text-(--text-tertiary) font-semibold mb-1">Applied</span>
+          <div
+            class="grid grid-cols-3 gap-1 bg-(--bg-base) p-1 rounded-lg border border-(--border-subtle) mb-4"
+          >
+            <button
+              class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {appliedFilter ===
+              'all'
+                ? 'bg-(--bg-surface) text-(--text-primary) shadow-sm'
+                : 'text-(--text-secondary) hover:text-(--text-primary)'}"
+              onclick={() => onAppliedFilterChange("all")}
+            >
+              All
+            </button>
+            <button
+              class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {appliedFilter ===
+              'only'
+                ? 'bg-(--bg-surface) text-(--text-primary) shadow-sm'
+                : 'text-(--text-secondary) hover:text-(--text-primary)'}"
+              onclick={() => onAppliedFilterChange("only")}
+            >
+              Only
+            </button>
+            <button
+              class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {appliedFilter ===
+              'hide'
+                ? 'bg-(--bg-surface) text-(--text-primary) shadow-sm'
+                : 'text-(--text-secondary) hover:text-(--text-primary)'}"
+              onclick={() => onAppliedFilterChange("hide")}
+            >
+              Hide
+            </button>
+          </div>
+
+          <span class="text-xs text-(--text-tertiary) font-semibold mb-1">Not Interested</span>
+          <div
+            class="grid grid-cols-3 gap-1 bg-(--bg-base) p-1 rounded-lg border border-(--border-subtle)"
+          >
+            <button
+              class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {notInterestedFilter ===
+              'all'
+                ? 'bg-(--bg-surface) text-(--text-primary) shadow-sm'
+                : 'text-(--text-secondary) hover:text-(--text-primary)'}"
+              onclick={() => onNotInterestedFilterChange("all")}
+            >
+              Show
+            </button>
+            <button
+              class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {notInterestedFilter ===
+              'only'
+                ? 'bg-(--bg-surface) text-(--text-primary) shadow-sm'
+                : 'text-(--text-secondary) hover:text-(--text-primary)'}"
+              onclick={() => onNotInterestedFilterChange("only")}
+            >
+              Only
+            </button>
+            <button
+              class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {notInterestedFilter ===
+              'hide'
+                ? 'bg-(--bg-surface) text-(--text-primary) shadow-sm'
+                : 'text-(--text-secondary) hover:text-(--text-primary)'}"
+              onclick={() => onNotInterestedFilterChange("hide")}
+            >
+              Hide
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="flex flex-col gap-1.5">

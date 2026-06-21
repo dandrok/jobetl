@@ -14,7 +14,9 @@ export const jobsTable = sqliteTable("jobs", {
   summary: text("summary"),
   status: text("status").notNull(),
   isApplied: integer("is_applied").notNull().default(0),
+  isNotInterested: integer("is_not_interested").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
-  postedAt: text("posted_at")
+  postedAt: text("posted_at"),
+  appliedAt: text("applied_at")
 });

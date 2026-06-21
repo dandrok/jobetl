@@ -24,7 +24,9 @@
 <div
   class="flex flex-col gap-3 relative p-5 rounded-2xl md:rounded-none md:grid md:grid-cols-[80px_3fr_2fr_1fr] md:p-5 md:px-6 border border-(--border-subtle) md:border-0 md:border-b mb-4 md:mb-0 items-start md:items-center cursor-pointer hover:bg-(--bg-hover) transition-colors duration-200 w-full text-left outline-none shadow-sm md:shadow-none {job.isApplied
     ? 'bg-(--accent-light) md:bg-(--accent-light) opacity-85'
-    : 'bg-(--bg-surface) md:bg-transparent'}"
+    : job.isNotInterested
+      ? 'opacity-60 bg-transparent'
+      : 'bg-(--bg-surface) md:bg-transparent'}"
   role="button"
   tabindex="0"
   aria-label="View details for {job.title} at {job.company}"
@@ -65,7 +67,13 @@
           >Applied</span
         >
       {/if}
-      {#if isNew}
+      {#if job.isNotInterested}
+        <span
+          class="text-[0.65rem] font-bold px-1.5 py-0.5 rounded bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 tracking-wider uppercase shrink-0 border border-red-500/20"
+          >Not Interested</span
+        >
+      {/if}
+      {#if isNew && !job.isApplied && !job.isNotInterested}
         <span
           class="text-[0.65rem] font-bold px-1.5 py-0.5 rounded bg-(--accent-light) text-(--accent) tracking-wider uppercase shrink-0"
           >New</span
@@ -124,6 +132,22 @@
       >
       <span class="truncate">{formattedDate}</span>
     </div>
+    {#if job.isApplied && job.appliedAt}
+      <div class="flex items-center gap-2 min-w-0 w-full text-(--accent) font-semibold">
+        <svg
+          class="shrink-0"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span class="truncate">Applied: {new Date(job.appliedAt).toLocaleDateString()}</span>
+      </div>
+    {/if}
   </div>
 
   <!-- Action -->

@@ -75,7 +75,9 @@ export interface StoredJob {
   summary?: string;
   status: JobStatus;
   isApplied?: boolean;
+  isNotInterested?: boolean;
   postedAt?: string | null;
+  appliedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

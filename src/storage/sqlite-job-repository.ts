@@ -23,7 +23,9 @@ function mapRow(row: typeof jobsTable.$inferSelect): StoredJob {
     summary: row.summary ?? undefined,
     status: row.status as StoredJob["status"],
     isApplied: Boolean(row.isApplied),
+    isNotInterested: Boolean(row.isNotInterested),
     postedAt: row.postedAt ?? undefined,
+    appliedAt: row.appliedAt ?? undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
@@ -53,9 +55,11 @@ export class SQLiteJobRepository {
         summary TEXT,
         status TEXT NOT NULL,
         is_applied INTEGER NOT NULL DEFAULT 0,
+        is_not_interested INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        posted_at TEXT
+        posted_at TEXT,
+        applied_at TEXT
       );
     `);
 
@@ -68,6 +72,14 @@ export class SQLiteJobRepository {
     const hasPostedAt = tableInfo.some((col) => col.name === "posted_at");
     if (!hasPostedAt) {
       sqlite.exec("ALTER TABLE jobs ADD COLUMN posted_at TEXT;");
+    }
+    const hasIsNotInterested = tableInfo.some((col) => col.name === "is_not_interested");
+    if (!hasIsNotInterested) {
+      sqlite.exec("ALTER TABLE jobs ADD COLUMN is_not_interested INTEGER NOT NULL DEFAULT 0;");
+    }
+    const hasAppliedAt = tableInfo.some((col) => col.name === "applied_at");
+    if (!hasAppliedAt) {
+      sqlite.exec("ALTER TABLE jobs ADD COLUMN applied_at TEXT;");
     }
   }
 
@@ -201,15 +213,23 @@ export class SQLiteJobRepository {
     if (typeof job.isApplied === "boolean") {
       setClause.isApplied = job.isApplied ? 1 : 0;
     }
+    if (typeof job.isNotInterested === "boolean") {
+      setClause.isNotInterested = job.isNotInterested ? 1 : 0;
+    }
     if (typeof job.postedAt === "string" || job.postedAt === null) {
       setClause.postedAt = job.postedAt;
+    }
+    if (typeof job.appliedAt === "string" || job.appliedAt === null) {
+      setClause.appliedAt = job.appliedAt;
     }
 
     const values = {
       externalId: job.externalId,
       ...setClause,
       isApplied: setClause.isApplied ?? 0,
-      postedAt: setClause.postedAt ?? null
+      isNotInterested: setClause.isNotInterested ?? 0,
+      postedAt: setClause.postedAt ?? null,
+      appliedAt: setClause.appliedAt ?? null
     };
 
     this.db
@@ -224,9 +244,20 @@ export class SQLiteJobRepository {
 
   updateJobAppliedStatus(externalId: string, isApplied: boolean): boolean {
     const now = new Date().toISOString();
+    const appliedAt = isApplied ? now : null;
     const result = this.db
       .update(jobsTable)
-      .set({ isApplied: isApplied ? 1 : 0, updatedAt: now })
+      .set({ isApplied: isApplied ? 1 : 0, appliedAt, updatedAt: now })
+      .where(eq(jobsTable.externalId, externalId))
+      .run();
+    return result.changes > 0;
+  }
+
+  updateJobInterestedStatus(externalId: string, isNotInterested: boolean): boolean {
+    const now = new Date().toISOString();
+    const result = this.db
+      .update(jobsTable)
+      .set({ isNotInterested: isNotInterested ? 1 : 0, updatedAt: now })
       .where(eq(jobsTable.externalId, externalId))
       .run();
     return result.changes > 0;

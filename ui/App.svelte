@@ -10,6 +10,8 @@
   let currentFilter = $state<"matched" | "all" | "rejected">("matched");
   let currentSort = $state<"score" | "date">("score");
   let searchQuery = $state("");
+  let appliedFilter = $state<"all" | "only" | "hide">("all");
+  let notInterestedFilter = $state<"all" | "only" | "hide">("hide");
 
   let selectedSources = $state<Set<string>>(new Set());
   let allSources = $derived([...new Set(allJobs.map((j) => j.source))].filter(Boolean));
@@ -30,10 +32,30 @@
         const jobIndex = allJobs.findIndex((j) => j.externalId === id);
         if (jobIndex !== -1) {
           allJobs[jobIndex].isApplied = isApplied;
+          allJobs[jobIndex].appliedAt = isApplied ? new Date().toISOString() : undefined;
         }
       }
     } catch (err) {
       console.error("Failed to update apply status", err);
+    }
+  }
+
+  async function toggleNotInterested(id: string, isNotInterested: boolean) {
+    try {
+      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isNotInterested })
+      });
+      if (res.ok) {
+        // Update local state instantly
+        const jobIndex = allJobs.findIndex((j) => j.externalId === id);
+        if (jobIndex !== -1) {
+          allJobs[jobIndex].isNotInterested = isNotInterested;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to update interested status", err);
     }
   }
 
@@ -44,10 +66,18 @@
       if (currentFilter === "matched" && job.status !== "matched") return false;
       if (currentFilter === "rejected" && job.status !== "rejected") return false;
 
-      // 2. Filter by selected sources
+      // 2. Filter by applied status
+      if (appliedFilter === "only" && !job.isApplied) return false;
+      if (appliedFilter === "hide" && job.isApplied) return false;
+
+      // 3. Filter by not interested status
+      if (notInterestedFilter === "only" && !job.isNotInterested) return false;
+      if (notInterestedFilter === "hide" && job.isNotInterested) return false;
+
+      // 4. Filter by selected sources
       if (!selectedSources.has(job.source)) return false;
 
-      // 3. Search query
+      // 5. Search query
       if (searchQuery.trim() !== "") {
         const q = searchQuery.toLowerCase();
         const t = (job.title || "").toLowerCase();
@@ -164,6 +194,10 @@
     onToggleTheme={toggleTheme}
     isCollapsed={isSidebarCollapsed}
     onClose={() => (isSidebarCollapsed = true)}
+    {appliedFilter}
+    onAppliedFilterChange={(f) => (appliedFilter = f)}
+    {notInterestedFilter}
+    onNotInterestedFilterChange={(f) => (notInterestedFilter = f)}
   />
 
   <main class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full">
@@ -229,4 +263,5 @@
   isOpen={selectedJob !== null}
   onClose={() => (selectedJob = null)}
   onToggleApply={toggleApply}
+  onToggleNotInterested={toggleNotInterested}
 />

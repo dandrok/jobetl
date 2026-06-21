@@ -11,4 +11,6 @@ export interface StoredJob {
   matchReason?: string;
   createdAt: string;
   isApplied: boolean;
+  isNotInterested: boolean;
+  appliedAt?: string;
 }

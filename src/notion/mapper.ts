@@ -217,6 +217,10 @@ export function buildNotionJobProperties(
     properties.Applied = { checkbox: job.isApplied ?? false };
   }
 
+  if (schema.isNotInterestedKind) {
+    properties["Not Interested"] = { checkbox: job.isNotInterested ?? false };
+  }
+
   const createdAtProperty = dateOrRichTextProperty(schema.createdAtKind, job.createdAt);
   if (createdAtProperty) {
     properties["Created At"] = createdAtProperty;
@@ -225,6 +229,14 @@ export function buildNotionJobProperties(
   const updatedAtProperty = dateOrRichTextProperty(schema.updatedAtKind, job.updatedAt);
   if (updatedAtProperty) {
     properties["Updated At"] = updatedAtProperty;
+  }
+
+  if (schema.appliedAtKind) {
+    properties["Applied At"] = job.appliedAt
+      ? dateOrRichTextProperty(schema.appliedAtKind, job.appliedAt)
+      : schema.appliedAtKind === "date"
+        ? { date: null }
+        : richTextProperty(undefined);
   }
 
   return properties;
@@ -268,7 +280,15 @@ export function mapNotionPageToStoredJob(
     matchReason: readRichTextPlainText(page.properties["Match Reason"]),
     summary: readRichTextPlainText(page.properties.Summary),
     isApplied: schema.isAppliedKind ? readCheckbox(page.properties.Applied) : false,
+    isNotInterested: schema.isNotInterestedKind
+      ? readCheckbox(page.properties["Not Interested"])
+      : false,
     status,
+    appliedAt: schema.appliedAtKind
+      ? (readDateStart(page.properties["Applied At"]) ??
+        readRichTextPlainText(page.properties["Applied At"]) ??
+        undefined)
+      : undefined,
     createdAt:
       readDateStart(page.properties["Created At"]) ??
       readRichTextPlainText(page.properties["Created At"]) ??
