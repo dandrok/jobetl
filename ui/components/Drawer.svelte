@@ -4,11 +4,12 @@
   import { cubicOut } from "svelte/easing";
   import { focusTrap } from "../actions/focusTrap";
 
-  let { job, isOpen, onClose, onToggleApply } = $props<{
+  let { job, isOpen, onClose, onToggleApply, onToggleNotInterested } = $props<{
     job: StoredJob | null;
     isOpen: boolean;
     onClose: () => void;
     onToggleApply: (id: string, isApplied: boolean) => void;
+    onToggleNotInterested: (id: string, isNotInterested: boolean) => void;
   }>();
 
   let displayJob = $state<StoredJob | null>(null);
@@ -96,18 +97,33 @@
     </div>
 
     <div class="p-8 lg:p-10 overflow-y-auto flex-1">
-      <div class="flex items-center gap-2 mb-8">
-        <input
-          type="checkbox"
-          id="drawApplied"
-          checked={displayJob?.isApplied}
-          onchange={(e) => {
-            if (displayJob) onToggleApply(displayJob.externalId, e.currentTarget.checked);
-          }}
-          class="w-5 h-5 accent-(--accent) cursor-pointer rounded"
-        />
-        <label for="drawApplied" class="font-medium text-base cursor-pointer text-(--text-primary)">
+      <div class="flex flex-wrap items-center gap-6 mb-8">
+        <label
+          class="flex items-center gap-2 font-medium text-base cursor-pointer text-(--text-primary)"
+        >
+          <input
+            type="checkbox"
+            checked={displayJob?.isApplied}
+            onchange={(e) => {
+              if (displayJob) onToggleApply(displayJob.externalId, e.currentTarget.checked);
+            }}
+            class="w-5 h-5 accent-(--accent) cursor-pointer rounded"
+          />
           CV Sent / Applied
+        </label>
+
+        <label
+          class="flex items-center gap-2 font-medium text-base cursor-pointer text-(--text-primary)"
+        >
+          <input
+            type="checkbox"
+            checked={displayJob?.isNotInterested}
+            onchange={(e) => {
+              if (displayJob) onToggleNotInterested(displayJob.externalId, e.currentTarget.checked);
+            }}
+            class="w-5 h-5 accent-(--danger) cursor-pointer rounded"
+          />
+          Not Interested
         </label>
       </div>
 

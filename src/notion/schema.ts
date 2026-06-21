@@ -12,8 +12,10 @@ export interface NotionJobDatabaseSchema {
   matchReasonKind?: "rich_text";
   summaryKind?: "rich_text";
   isAppliedKind?: "checkbox";
+  isNotInterestedKind?: "checkbox";
   createdAtKind?: "date" | "rich_text";
   updatedAtKind?: "date" | "rich_text";
+  appliedAtKind?: "date" | "rich_text";
 }
 
 function requirePropertyType(
@@ -70,8 +72,10 @@ export function buildNotionJobDatabaseSchema(
   const matchReasonKind = readOptionalPropertyType(database, "Match Reason", ["rich_text"]);
   const summaryKind = readOptionalPropertyType(database, "Summary", ["rich_text"]);
   const isAppliedKind = readOptionalPropertyType(database, "Applied", ["checkbox"]);
+  const isNotInterestedKind = readOptionalPropertyType(database, "Not Interested", ["checkbox"]);
   const createdAtKind = readOptionalPropertyType(database, "Created At", ["date", "rich_text"]);
   const updatedAtKind = readOptionalPropertyType(database, "Updated At", ["date", "rich_text"]);
+  const appliedAtKind = readOptionalPropertyType(database, "Applied At", ["date", "rich_text"]);
 
   return {
     statusKind: statusKind as NotionJobDatabaseSchema["statusKind"],
@@ -83,7 +87,9 @@ export function buildNotionJobDatabaseSchema(
     matchReasonKind: matchReasonKind as NotionJobDatabaseSchema["matchReasonKind"],
     summaryKind: summaryKind as NotionJobDatabaseSchema["summaryKind"],
     isAppliedKind: isAppliedKind as NotionJobDatabaseSchema["isAppliedKind"],
+    isNotInterestedKind: isNotInterestedKind as NotionJobDatabaseSchema["isNotInterestedKind"],
     createdAtKind: createdAtKind as NotionJobDatabaseSchema["createdAtKind"],
-    updatedAtKind: updatedAtKind as NotionJobDatabaseSchema["updatedAtKind"]
+    updatedAtKind: updatedAtKind as NotionJobDatabaseSchema["updatedAtKind"],
+    appliedAtKind: appliedAtKind as NotionJobDatabaseSchema["appliedAtKind"]
   };
 }
