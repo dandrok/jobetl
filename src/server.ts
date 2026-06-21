@@ -55,11 +55,13 @@ export function startServer() {
             let handled = false;
 
             if (typeof data.isApplied === "boolean") {
-              updated = repository.updateJobAppliedStatus(id, data.isApplied);
+              const resApplied = repository.updateJobAppliedStatus(id, data.isApplied);
+              updated = updated || resApplied;
               handled = true;
             }
             if (typeof data.isNotInterested === "boolean") {
-              updated = repository.updateJobInterestedStatus(id, data.isNotInterested);
+              const resInterested = repository.updateJobInterestedStatus(id, data.isNotInterested);
+              updated = updated || resInterested;
               handled = true;
             }
 

@@ -227,7 +227,7 @@
                 : 'text-(--text-secondary) hover:text-(--text-primary)'}"
               onclick={() => onNotInterestedFilterChange("all")}
             >
-              Show
+              All
             </button>
             <button
               class="px-2 py-1.5 text-xs rounded font-medium transition-colors cursor-pointer {notInterestedFilter ===
