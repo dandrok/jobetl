@@ -153,6 +153,13 @@ Launch the interactive Svelte Web Dashboard:
 npm run dev:ui
 ```
 
+### Dashboard Features
+
+The Svelte-based dashboard provides:
+* **Interactive Metrics Grid:** Live tracking of *Total Evaluated*, *Matched*, *Applied*, *Not Interested*, *Avg Match Score*, and *Reject Rate*. Click the Total Evaluated, Matched, Applied, Not Interested, or Reject Rate cards to filter listings.
+* **Global Filter Synchronization:** Main navigation filters and sidebar status segments (Show, Hide, Only) sync bidirectionally.
+* **Drawer view:** Inspect details, toggle applied state (stores `appliedAt` timestamp), or mark as not interested.
+
 Optional Notion sync commands:
 
 ```bash

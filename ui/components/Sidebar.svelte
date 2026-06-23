@@ -17,8 +17,8 @@
     notInterestedFilter,
     onNotInterestedFilterChange
   } = $props<{
-    currentFilter: "matched" | "all" | "rejected";
-    onFilterChange: (f: "matched" | "all" | "rejected") => void;
+    currentFilter: "matched" | "all" | "rejected" | "applied" | "not-interested";
+    onFilterChange: (f: "matched" | "all" | "rejected" | "applied" | "not-interested") => void;
     allSources: string[];
     selectedSources: Set<string>;
     onToggleSource: (s: string) => void;
@@ -152,6 +152,47 @@
             ></path></svg
           >
           All Evaluated
+        </button>
+
+        <button
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.95rem] transition-colors duration-200 w-full text-left {currentFilter ===
+          'applied'
+            ? 'bg-(--accent-light) text-(--accent) font-medium'
+            : 'text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)'}"
+          onclick={() => onFilterChange("applied")}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            ><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline
+              points="22 4 12 14.01 9 11.01"
+            ></polyline></svg
+          >
+          Applied
+        </button>
+
+        <button
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.95rem] transition-colors duration-200 w-full text-left {currentFilter ===
+          'not-interested'
+            ? 'bg-(--accent-light) text-(--accent) font-medium'
+            : 'text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)'}"
+          onclick={() => onFilterChange("not-interested")}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            ><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"
+            ></line></svg
+          >
+          Not Interested
         </button>
 
         <button

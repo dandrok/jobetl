@@ -7,7 +7,9 @@
   import "./app.css";
 
   let allJobs = $state<StoredJob[]>([]);
-  let currentFilter = $state<"matched" | "all" | "rejected">("matched");
+  let currentFilter = $state<"matched" | "all" | "rejected" | "applied" | "not-interested">(
+    "matched"
+  );
   let currentSort = $state<"score" | "date">("score");
   let searchQuery = $state("");
   let appliedFilter = $state<"all" | "only" | "hide">("all");
@@ -34,6 +36,10 @@
           allJobs[jobIndex].isApplied = isApplied;
           allJobs[jobIndex].appliedAt = isApplied ? new Date().toISOString() : undefined;
         }
+        if (selectedJob && selectedJob.externalId === id) {
+          selectedJob.isApplied = isApplied;
+          selectedJob.appliedAt = isApplied ? new Date().toISOString() : undefined;
+        }
       }
     } catch (err) {
       console.error("Failed to update apply status", err);
@@ -53,6 +59,9 @@
         if (jobIndex !== -1) {
           allJobs[jobIndex].isNotInterested = isNotInterested;
         }
+        if (selectedJob && selectedJob.externalId === id) {
+          selectedJob.isNotInterested = isNotInterested;
+        }
       }
     } catch (err) {
       console.error("Failed to update interested status", err);
@@ -62,22 +71,27 @@
   // Derived filtered jobs
   const filteredJobs = $derived.by(() => {
     let result = allJobs.filter((job) => {
-      // 1. Filter by intelligence status
+      // 1. Filter by intelligence/main status selection
       if (currentFilter === "matched" && job.status !== "matched") return false;
       if (currentFilter === "rejected" && job.status !== "rejected") return false;
+      if (currentFilter === "applied" && !job.isApplied) return false;
+      if (currentFilter === "not-interested" && !job.isNotInterested) return false;
 
-      // 2. Filter by applied status
-      if (appliedFilter === "only" && !job.isApplied) return false;
-      if (appliedFilter === "hide" && job.isApplied) return false;
+      // 2. Filter by status filters (segmented controls)
+      if (currentFilter !== "applied") {
+        if (appliedFilter === "only" && !job.isApplied) return false;
+        if (appliedFilter === "hide" && job.isApplied) return false;
+      }
 
-      // 3. Filter by not interested status
-      if (notInterestedFilter === "only" && !job.isNotInterested) return false;
-      if (notInterestedFilter === "hide" && job.isNotInterested) return false;
+      if (currentFilter !== "not-interested") {
+        if (notInterestedFilter === "only" && !job.isNotInterested) return false;
+        if (notInterestedFilter === "hide" && job.isNotInterested) return false;
+      }
 
-      // 4. Filter by selected sources
+      // 3. Filter by selected sources
       if (!selectedSources.has(job.source)) return false;
 
-      // 5. Search query
+      // 4. Search query
       if (searchQuery.trim() !== "") {
         const q = searchQuery.toLowerCase();
         const t = (job.title || "").toLowerCase();
@@ -88,7 +102,7 @@
       return true;
     });
 
-    // 4. Sort
+    // 5. Sort
     result.sort((a, b) => {
       if (currentSort === "score") {
         const sa = a.matchScore || 0;
@@ -106,6 +120,8 @@
   // Derived metrics
   const totalEvaluated = $derived(allJobs.length);
   const totalMatched = $derived(allJobs.filter((j) => j.status === "matched").length);
+  const totalApplied = $derived(allJobs.filter((j) => j.isApplied).length);
+  const totalNotInterested = $derived(allJobs.filter((j) => j.isNotInterested).length);
   const avgScore = $derived.by(() => {
     const scored = allJobs.filter((j) => j.matchScore);
     if (scored.length === 0) return "-";
@@ -172,10 +188,44 @@
 
   let isSidebarCollapsed = $state(true);
 
-  function handleFilterChange(f: "matched" | "all" | "rejected") {
+  function handleFilterChange(f: "matched" | "all" | "rejected" | "applied" | "not-interested") {
     currentFilter = f;
+    if (f === "applied") {
+      appliedFilter = "only";
+      notInterestedFilter = "hide";
+    } else if (f === "not-interested") {
+      notInterestedFilter = "only";
+      appliedFilter = "all";
+    } else {
+      appliedFilter = "all";
+      notInterestedFilter = "hide";
+    }
     if (window.innerWidth <= 1024) {
       isSidebarCollapsed = true;
+    }
+  }
+
+  function handleAppliedFilterChange(f: "all" | "only" | "hide") {
+    appliedFilter = f;
+    if (f === "only") {
+      currentFilter = "applied";
+      if (notInterestedFilter === "only") {
+        notInterestedFilter = "hide";
+      }
+    } else if (currentFilter === "applied") {
+      currentFilter = "all";
+    }
+  }
+
+  function handleNotInterestedFilterChange(f: "all" | "only" | "hide") {
+    notInterestedFilter = f;
+    if (f === "only") {
+      currentFilter = "not-interested";
+      if (appliedFilter === "only") {
+        appliedFilter = "all";
+      }
+    } else if (currentFilter === "not-interested") {
+      currentFilter = "all";
     }
   }
 
@@ -195,9 +245,9 @@
     isCollapsed={isSidebarCollapsed}
     onClose={() => (isSidebarCollapsed = true)}
     {appliedFilter}
-    onAppliedFilterChange={(f) => (appliedFilter = f)}
+    onAppliedFilterChange={handleAppliedFilterChange}
     {notInterestedFilter}
-    onNotInterestedFilterChange={(f) => (notInterestedFilter = f)}
+    onNotInterestedFilterChange={handleNotInterestedFilterChange}
   />
 
   <main class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full">
@@ -213,7 +263,18 @@
 
     <div class="p-4 md:p-8 xl:px-12 flex flex-col gap-6 md:gap-10 w-full">
       <section aria-label="Dashboard Metrics">
-        <Metrics {totalEvaluated} {totalMatched} {avgScore} {rejectRate} />
+        <Metrics
+          {totalEvaluated}
+          {totalMatched}
+          {totalApplied}
+          {totalNotInterested}
+          {avgScore}
+          {rejectRate}
+          {currentFilter}
+          {appliedFilter}
+          {notInterestedFilter}
+          onMetricClick={handleFilterChange}
+        />
       </section>
 
       <section

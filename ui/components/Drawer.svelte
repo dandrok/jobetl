@@ -12,11 +12,15 @@
     onToggleNotInterested: (id: string, isNotInterested: boolean) => void;
   }>();
 
-  let displayJob = $state<StoredJob | null>(null);
+  let lastNonNullJob = $state<StoredJob | null>(null);
 
   $effect(() => {
-    displayJob = job;
+    if (job) {
+      lastNonNullJob = job;
+    }
   });
+
+  const activeJob = $derived(job || lastNonNullJob);
 </script>
 
 {#if isOpen}
@@ -57,40 +61,40 @@
         </svg>
       </button>
       <div class="text-[0.95rem] font-medium uppercase tracking-wider text-(--text-tertiary) mb-3">
-        {displayJob?.company}
+        {activeJob?.company}
       </div>
       <h2
         class="font-serif text-3xl lg:text-4xl text-(--text-primary) mb-6 pr-12 leading-tight tracking-tight"
         id="drawTitle"
       >
-        {displayJob?.title}
+        {activeJob?.title}
       </h2>
 
       <div class="flex flex-wrap gap-2">
-        {#if displayJob?.matchScore != null}
+        {#if activeJob?.matchScore != null}
           <div
             class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--success)"
           >
-            {Math.round(displayJob.matchScore * 100)}%
+            {Math.round(activeJob.matchScore * 100)}%
           </div>
         {/if}
         <div
           class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--text-secondary)"
         >
-          {displayJob?.source}
+          {activeJob?.source}
         </div>
-        {#if displayJob?.location}
+        {#if activeJob?.location}
           <div
             class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--text-secondary)"
           >
-            {displayJob.location}
+            {activeJob.location}
           </div>
         {/if}
-        {#if displayJob?.salary}
+        {#if activeJob?.salaryText}
           <div
             class="bg-(--bg-base) border border-(--border-subtle) px-3 py-1.5 rounded-md text-xs font-medium text-(--text-secondary)"
           >
-            {displayJob.salary}
+            {activeJob.salaryText}
           </div>
         {/if}
       </div>
@@ -103,9 +107,9 @@
         >
           <input
             type="checkbox"
-            checked={displayJob?.isApplied}
+            checked={activeJob?.isApplied}
             onchange={(e) => {
-              if (displayJob) onToggleApply(displayJob.externalId, e.currentTarget.checked);
+              if (activeJob) onToggleApply(activeJob.externalId, e.currentTarget.checked);
             }}
             class="w-5 h-5 accent-(--accent) cursor-pointer rounded"
           />
@@ -117,9 +121,9 @@
         >
           <input
             type="checkbox"
-            checked={displayJob?.isNotInterested}
+            checked={activeJob?.isNotInterested}
             onchange={(e) => {
-              if (displayJob) onToggleNotInterested(displayJob.externalId, e.currentTarget.checked);
+              if (activeJob) onToggleNotInterested(activeJob.externalId, e.currentTarget.checked);
             }}
             class="w-5 h-5 accent-(--danger) cursor-pointer rounded"
           />
@@ -147,16 +151,16 @@
       <div
         class="font-serif text-lg leading-relaxed text-(--text-primary) mb-12 whitespace-pre-wrap"
       >
-        {#if displayJob?.matchReason}
-          {displayJob.matchReason}
+        {#if activeJob?.matchReason}
+          {activeJob.matchReason}
         {:else}
           No analysis available.
         {/if}
       </div>
 
-      {#if displayJob?.url}
+      {#if activeJob?.url}
         <a
-          href={displayJob.url}
+          href={activeJob.url}
           target="_blank"
           rel="noopener noreferrer"
           class="inline-flex items-center gap-2 bg-(--text-primary) text-(--bg-base) px-6 py-3.5 rounded-lg text-[0.95rem] font-medium hover:opacity-90 transition-opacity duration-200"
