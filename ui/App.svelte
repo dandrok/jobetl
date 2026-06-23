@@ -36,6 +36,10 @@
           allJobs[jobIndex].isApplied = isApplied;
           allJobs[jobIndex].appliedAt = isApplied ? new Date().toISOString() : undefined;
         }
+        if (selectedJob && selectedJob.externalId === id) {
+          selectedJob.isApplied = isApplied;
+          selectedJob.appliedAt = isApplied ? new Date().toISOString() : undefined;
+        }
       }
     } catch (err) {
       console.error("Failed to update apply status", err);
@@ -54,6 +58,9 @@
         const jobIndex = allJobs.findIndex((j) => j.externalId === id);
         if (jobIndex !== -1) {
           allJobs[jobIndex].isNotInterested = isNotInterested;
+        }
+        if (selectedJob && selectedJob.externalId === id) {
+          selectedJob.isNotInterested = isNotInterested;
         }
       }
     } catch (err) {

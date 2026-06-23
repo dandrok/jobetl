@@ -8,7 +8,7 @@
     onToggleSidebar,
     isSidebarCollapsed
   } = $props<{
-    currentFilter: "matched" | "all" | "rejected";
+    currentFilter: "matched" | "all" | "rejected" | "applied" | "not-interested";
     currentSort: "score" | "date";
     onSortChange: (s: "score" | "date") => void;
     searchQuery: string;
@@ -17,9 +17,11 @@
     isSidebarCollapsed: boolean;
   }>();
 
-  function getTitle(f: "matched" | "all" | "rejected") {
+  function getTitle(f: "matched" | "all" | "rejected" | "applied" | "not-interested") {
     if (f === "matched") return "Matched";
     if (f === "all") return "All Evaluated";
+    if (f === "applied") return "Applied";
+    if (f === "not-interested") return "Not Interested";
     return "Rejected";
   }
 </script>
