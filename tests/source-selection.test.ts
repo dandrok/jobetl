@@ -6,7 +6,7 @@ import type { RunConfig } from "@core/types";
 
 function createConfig(): RunConfig {
   return {
-    databasePath: "./data/test.db",
+    databaseUrl: "postgres://localhost:5432/test",
     resumeMarkdownPath: "./cv.example.md",
     matchThreshold: 0.78,
     fetchConcurrency: 1,

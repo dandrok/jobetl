@@ -2,7 +2,7 @@
 
 JobETL helps you turn job boards into a short list of jobs that actually fit your CV.
 
-It discovers listings from supported sources, fetches each full offer description (using Jina Reader with a local Cheerio HTML-to-text fallback), scores it against your resume with AI, and stores the result in a local SQLite database. Optional Notion sync lets the same data flow through GitHub Actions.
+It discovers listings from supported sources, fetches each full offer description (using Jina Reader with a local Cheerio HTML-to-text fallback), scores it against your resume with AI, and stores the result in a local PostgreSQL database. Optional Notion sync lets the same data flow through GitHub Actions.
 
 ## The Idea In 30 Seconds
 
@@ -19,7 +19,7 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 - Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`
 - Full-offer extraction: Jina Reader (with local Cheerio HTML-to-text fallback)
 - AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
-- Storage: local SQLite (`./data/jobetl.db`) managed via **Drizzle ORM**
+- Storage: local PostgreSQL database managed via **Drizzle ORM**
 - UI: Svelte 5 + Vite
 - Optional sync: Notion
 - Automation: GitHub Actions
@@ -46,9 +46,9 @@ With the clean Markdown in hand, we evaluate the job.
 - **DeepSeek V4 (`deepseek-v4-flash`)** is used via the Vercel AI SDK to score the job descriptions against your personal `cv.md`. 
 - **Why DeepSeek?** DeepSeek V4 Flash provides high-level reasoning and matching intelligence at an extremely low price point. Its superior cost-to-performance ratio and fast response times make it ideal for bulk-scoring hundreds of job descriptions daily without excessive API costs.
 
-### 4. Storage (SQLite + Drizzle ORM)
-Everything is saved locally so we don't re-process or re-score the same jobs tomorrow.
-- **SQLite** is the local database (`./data/jobetl.db`).
+### 4. Storage (PostgreSQL + Drizzle ORM)
+Everything is saved in a local containerized database so we don't re-process or re-score the same jobs tomorrow.
+- **PostgreSQL** is the database, running inside a local Docker container (configured via Docker Compose with persistent named volumes).
 - **Drizzle ORM** manages the schema and queries. We chose Drizzle because it provides 100% strict TypeScript safety for our SQL queries, eliminating runtime bugs and making the database logic extremely easy to refactor without heavy boilerplate.
 
 ---
@@ -60,7 +60,7 @@ flowchart TD
     subgraph Discovery [1. Discovery Layer]
         A[Job Boards] -->|Cheerio HTML Fetch| B[Source Adapters]
         B -->|Extract DOM Nodes| C{Zod Schema Validation}
-        C -->|Valid| D[(SQLite via Drizzle)]
+        C -->|Valid| D[(PostgreSQL via Drizzle)]
         C -->|Invalid| E[Telemetry Monitor]
     end
 
@@ -120,9 +120,16 @@ cp cv.example.md cv.md
 
 Then:
 
-1. Fill `.env` with your keys.
+1. Fill `.env` with your keys and set `DATABASE_URL` to point to your local PostgreSQL instance:
+   ```env
+   DATABASE_URL=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl
+   ```
 2. Update `resumeMarkdownPath` in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts) to `./cv.md`.
 3. Adjust source filters, `matchThreshold`, and concurrency in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
+4. Start your local database:
+   ```bash
+   npm run db:start
+   ```
 
 ## Run
 
@@ -174,7 +181,7 @@ The repo includes two core workflows:
 1. [`daily-crawl.yml`](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml): Production ETL cron job.
    - Trigger: daily schedule plus manual `workflow_dispatch`
    - Secrets: `JINA_API_KEY`, `DEEPSEEK_API_KEY`, `NOTION_TOKEN`, `NOTION_DATABASE_ID`
-   - Expectations: Expects Notion to be configured since it rebuilds local SQLite state from Notion before crawling.
+   - Expectations: Expects Notion to be configured since it rebuilds local PostgreSQL state from Notion before crawling.
 2. [`ci.yml`](/home/dandrok/git/jobetl/.github/workflows/ci.yml): Continuous Integration.
    - Trigger: `push` and `pull_request` to `master`.
    - Pipeline: Enforces Prettier formatting, ESLint rules, TypeScript compilation, and Vitest suite execution.

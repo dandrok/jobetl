@@ -3,7 +3,7 @@ import { buildNotionJobProperties, type NotionPageProperties } from "@notion/map
 import type { NotionJobDatabaseSchema } from "@notion/schema";
 
 export interface StoredJobReader {
-  listJobs(): StoredJob[];
+  listJobs(): Promise<StoredJob[]>;
 }
 
 export interface ExistingNotionJob {
@@ -46,7 +46,7 @@ export async function syncJobsToNotion(
   client: NotionSyncClient,
   progress?: NotionSyncProgressReporter
 ): Promise<NotionSyncSummary> {
-  const jobs = repository.listJobs();
+  const jobs = await repository.listJobs();
   const schema = await client.getSchema();
   const summary: NotionSyncSummary = {
     total: jobs.length,

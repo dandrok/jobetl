@@ -1,7 +1,12 @@
+import "dotenv/config";
 import type { RunConfig } from "@core/types";
 
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is not set.");
+}
+
 export const config: RunConfig = {
-  databasePath: "./data/jobetl.db",
+  databaseUrl: process.env.DATABASE_URL,
   resumeMarkdownPath: "./cv.md",
   matchThreshold: 0.78,
   fetchConcurrency: 10,

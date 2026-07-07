@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, text, real, boolean } from "drizzle-orm/pg-core";
 
-export const jobsTable = sqliteTable("jobs", {
+export const jobsTable = pgTable("jobs", {
   externalId: text("external_id").primaryKey(),
   source: text("source").notNull(),
   url: text("url").notNull(),
@@ -13,8 +13,8 @@ export const jobsTable = sqliteTable("jobs", {
   matchReason: text("match_reason"),
   summary: text("summary"),
   status: text("status").notNull(),
-  isApplied: integer("is_applied").notNull().default(0),
-  isNotInterested: integer("is_not_interested").notNull().default(0),
+  isApplied: boolean("is_applied").notNull().default(false),
+  isNotInterested: boolean("is_not_interested").notNull().default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   postedAt: text("posted_at"),

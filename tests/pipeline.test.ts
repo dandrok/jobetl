@@ -43,7 +43,7 @@ function createConfig(): RunConfig {
   writeFileSync(resumeMarkdownPath, "# Resume\n\nNode.js and ETL");
 
   return {
-    databasePath: join(dir, "jobetl.db"),
+    databaseUrl: "postgres://localhost:5432/test",
     resumeMarkdownPath,
     matchThreshold: 0.75,
     fetchConcurrency: 1,
@@ -169,7 +169,7 @@ function createRepository(
   return {
     jobs,
     operations,
-    upsertDiscoveredJob(job) {
+    async upsertDiscoveredJob(job) {
       operations.push(`upsert:${job.externalId}`);
       const existing = jobs.get(job.externalId);
 
@@ -184,27 +184,27 @@ function createRepository(
           : createStoredJob(job, "discovered")
       );
     },
-    getJobStatus(externalId) {
+    async getJobStatus(externalId) {
       operations.push(`status:${externalId}`);
       return jobs.get(externalId)?.status;
     },
-    markJobFetching(externalId) {
+    async markJobFetching(externalId) {
       operations.push(`fetching:${externalId}`);
       updateJob(externalId, { status: "fetching" });
     },
-    saveFetchedOffer(externalId, offerMarkdown) {
+    async saveFetchedOffer(externalId, offerMarkdown) {
       operations.push(`fetched:${externalId}`);
       updateJob(externalId, { offerMarkdown, status: "fetched" });
     },
-    markJobScoring(externalId) {
+    async markJobScoring(externalId) {
       operations.push(`scoring:${externalId}`);
       updateJob(externalId, { status: "scoring" });
     },
-    markJobError(externalId) {
+    async markJobError(externalId) {
       operations.push(`error:${externalId}`);
       updateJob(externalId, { status: "error" });
     },
-    saveScoredJob(candidate) {
+    async saveScoredJob(candidate) {
       operations.push(`scored:${candidate.job.externalId}`);
       updateJob(candidate.job.externalId, {
         offerMarkdown: candidate.job.offerMarkdown,
@@ -258,7 +258,7 @@ function createDependencies(
 ): PipelineDependencies {
   const loadResumeMarkdown =
     overrides.loadResumeMarkdown ?? vi.fn(async () => "# Resume\n\nNode.js and ETL");
-  const countStoredJobs = overrides.countStoredJobs ?? vi.fn(() => repository.jobs.size);
+  const countStoredJobs = overrides.countStoredJobs ?? vi.fn(async () => repository.jobs.size);
   const adapters = Array.isArray(listingsOrAdapters)
     ? createAdapters({ justjoinit: listingsOrAdapters })
     : listingsOrAdapters;

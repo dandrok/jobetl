@@ -1,36 +1,32 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, afterAll } from "vitest";
+import postgres from "postgres";
 
-import { SQLiteJobRepository } from "@storage/sqlite-job-repository";
+import { PostgresJobRepository } from "@storage/postgres-job-repository";
 import type { MatchCandidate } from "@core/types";
 
-const tempDirs: string[] = [];
+const baseConnectionString =
+  process.env.DATABASE_URL || "postgres://jobetl_user:secure_password_here@localhost:5432/jobetl";
+const connectionString = baseConnectionString.endsWith("/jobetl")
+  ? baseConnectionString.replace(/\/jobetl$/, "/jobetl_test")
+  : baseConnectionString;
+const sql = postgres(connectionString);
+const repository = new PostgresJobRepository(connectionString);
 
-afterEach(() => {
-  vi.useRealTimers();
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  }
+beforeEach(async () => {
+  // Clean the database before each test
+  await sql`TRUNCATE TABLE jobs CASCADE`;
 });
 
-function createRepository() {
-  const dir = mkdtempSync(join(tmpdir(), "jobetl-"));
-  tempDirs.push(dir);
-  const databasePath = join(dir, "jobetl.db");
+afterAll(async () => {
+  await repository.close();
+  await sql.end();
+});
 
-  return new SQLiteJobRepository(databasePath);
-}
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe("SQLiteJobRepository", () => {
-  test("stores discovered listings only once and updates existing rows", () => {
-    const repository = createRepository();
-
-    repository.upsertDiscoveredJob({
+describe("PostgresJobRepository", () => {
+  test("stores discovered listings only once and updates existing rows", async () => {
+    await repository.upsertDiscoveredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -40,7 +36,7 @@ describe("SQLiteJobRepository", () => {
       location: "Remote"
     });
 
-    repository.upsertDiscoveredJob({
+    await repository.upsertDiscoveredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -50,7 +46,7 @@ describe("SQLiteJobRepository", () => {
       location: "Remote"
     });
 
-    const jobs = repository.listJobs();
+    const jobs = await repository.listJobs();
 
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
@@ -61,11 +57,7 @@ describe("SQLiteJobRepository", () => {
     });
   });
 
-  test("does not bump updatedAt when rediscovered listing data is unchanged", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
-
-    const repository = createRepository();
+  test("does not bump updatedAt when rediscovered listing data is unchanged", async () => {
     const listing = {
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit" as const,
@@ -76,25 +68,22 @@ describe("SQLiteJobRepository", () => {
       location: "Remote"
     };
 
-    repository.upsertDiscoveredJob(listing);
-    const firstUpdatedAt = repository.listJobs()[0].updatedAt;
+    await repository.upsertDiscoveredJob(listing);
+    const jobs1 = await repository.listJobs();
+    const firstUpdatedAt = jobs1[0].updatedAt;
 
-    vi.setSystemTime(new Date("2024-01-01T00:05:00.000Z"));
-    repository.upsertDiscoveredJob(listing);
+    await sleep(50);
+    await repository.upsertDiscoveredJob(listing);
 
-    expect(repository.listJobs()[0]).toMatchObject({
+    const jobs2 = await repository.listJobs();
+    expect(jobs2[0]).toMatchObject({
       externalId: listing.externalId,
       updatedAt: firstUpdatedAt
     });
   });
 
-  test("bumps updatedAt when rediscovered listing data changed", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
-
-    const repository = createRepository();
-
-    repository.upsertDiscoveredJob({
+  test("bumps updatedAt when rediscovered listing data changed", async () => {
+    await repository.upsertDiscoveredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -103,10 +92,11 @@ describe("SQLiteJobRepository", () => {
       salaryText: "20 000 - 28 000 PLN/month",
       location: "Remote"
     });
-    const firstUpdatedAt = repository.listJobs()[0].updatedAt;
+    const jobs1 = await repository.listJobs();
+    const firstUpdatedAt = jobs1[0].updatedAt;
 
-    vi.setSystemTime(new Date("2024-01-01T00:05:00.000Z"));
-    repository.upsertDiscoveredJob({
+    await sleep(50);
+    await repository.upsertDiscoveredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -116,18 +106,17 @@ describe("SQLiteJobRepository", () => {
       location: "Remote"
     });
 
-    expect(repository.listJobs()[0]).toMatchObject({
+    const jobs2 = await repository.listJobs();
+    expect(jobs2[0]).toMatchObject({
       externalId: "justjoinit:/job-offer/acme",
       company: "Acme Updated",
       salaryText: "22 000 - 30 000 PLN/month"
     });
-    expect(repository.listJobs()[0].updatedAt).not.toBe(firstUpdatedAt);
+    expect(jobs2[0].updatedAt).not.toBe(firstUpdatedAt);
   });
 
-  test("returns job status for skip decisions and undefined for missing jobs", () => {
-    const repository = createRepository();
-
-    repository.upsertDiscoveredJob({
+  test("returns job status for skip decisions and undefined for missing jobs", async () => {
+    await repository.upsertDiscoveredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -135,18 +124,14 @@ describe("SQLiteJobRepository", () => {
       company: "Acme"
     });
 
-    expect(repository.getJobStatus("justjoinit:/job-offer/acme")).toBe("discovered");
-    expect(repository.getJobStatus("justjoinit:/job-offer/missing")).toBeUndefined();
+    expect(await repository.getJobStatus("justjoinit:/job-offer/acme")).toBe("discovered");
+    expect(await repository.getJobStatus("justjoinit:/job-offer/missing")).toBeUndefined();
   });
 
-  test("moves a job through fetching, fetched, scoring, and error states", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
-
-    const repository = createRepository();
+  test("moves a job through fetching, fetched, scoring, and error states", async () => {
     const externalId = "justjoinit:/job-offer/acme";
 
-    repository.upsertDiscoveredJob({
+    await repository.upsertDiscoveredJob({
       externalId,
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -156,7 +141,8 @@ describe("SQLiteJobRepository", () => {
       location: "Remote"
     });
 
-    const discoveredRow = repository.listJobs()[0];
+    const discoveredJobs = await repository.listJobs();
+    const discoveredRow = discoveredJobs[0];
     expect(discoveredRow).toMatchObject({
       externalId,
       title: "Senior Node Engineer",
@@ -166,9 +152,10 @@ describe("SQLiteJobRepository", () => {
       status: "discovered"
     });
 
-    vi.setSystemTime(new Date("2024-01-01T00:00:01.000Z"));
-    repository.markJobFetching(externalId);
-    const fetchingRow = repository.listJobs()[0];
+    await sleep(2);
+    await repository.markJobFetching(externalId);
+    const fetchingJobs = await repository.listJobs();
+    const fetchingRow = fetchingJobs[0];
     expect(fetchingRow).toMatchObject({
       externalId,
       title: "Senior Node Engineer",
@@ -178,11 +165,12 @@ describe("SQLiteJobRepository", () => {
       status: "fetching"
     });
     expect(fetchingRow.updatedAt).not.toBe(discoveredRow.updatedAt);
-    expect(repository.getJobStatus(externalId)).toBe("fetching");
+    expect(await repository.getJobStatus(externalId)).toBe("fetching");
 
-    vi.setSystemTime(new Date("2024-01-01T00:00:02.000Z"));
-    repository.saveFetchedOffer(externalId, "# Offer");
-    const fetchedRow = repository.listJobs()[0];
+    await sleep(2);
+    await repository.saveFetchedOffer(externalId, "# Offer");
+    const fetchedJobs = await repository.listJobs();
+    const fetchedRow = fetchedJobs[0];
     expect(fetchedRow).toMatchObject({
       externalId,
       title: "Senior Node Engineer",
@@ -192,11 +180,12 @@ describe("SQLiteJobRepository", () => {
       offerMarkdown: "# Offer",
       status: "fetched"
     });
-    expect(repository.getJobStatus(externalId)).toBe("fetched");
+    expect(await repository.getJobStatus(externalId)).toBe("fetched");
 
-    vi.setSystemTime(new Date("2024-01-01T00:00:03.000Z"));
-    repository.markJobScoring(externalId);
-    const scoringRow = repository.listJobs()[0];
+    await sleep(2);
+    await repository.markJobScoring(externalId);
+    const scoringJobs = await repository.listJobs();
+    const scoringRow = scoringJobs[0];
     expect(scoringRow).toMatchObject({
       externalId,
       title: "Senior Node Engineer",
@@ -206,11 +195,12 @@ describe("SQLiteJobRepository", () => {
       offerMarkdown: "# Offer",
       status: "scoring"
     });
-    expect(repository.getJobStatus(externalId)).toBe("scoring");
+    expect(await repository.getJobStatus(externalId)).toBe("scoring");
 
-    vi.setSystemTime(new Date("2024-01-01T00:00:04.000Z"));
-    repository.markJobError(externalId);
-    const errorRow = repository.listJobs()[0];
+    await sleep(2);
+    await repository.markJobError(externalId);
+    const errorJobs = await repository.listJobs();
+    const errorRow = errorJobs[0];
     expect(errorRow).toMatchObject({
       externalId,
       title: "Senior Node Engineer",
@@ -220,13 +210,10 @@ describe("SQLiteJobRepository", () => {
       offerMarkdown: "# Offer",
       status: "error"
     });
-    expect(repository.getJobStatus(externalId)).toBe("error");
-
-    vi.useRealTimers();
+    expect(await repository.getJobStatus(externalId)).toBe("error");
   });
 
-  test("persists scoring results for later local review", () => {
-    const repository = createRepository();
+  test("persists scoring results for later local review", async () => {
     const candidate: MatchCandidate = {
       job: {
         externalId: "justjoinit:/job-offer/acme",
@@ -246,10 +233,10 @@ describe("SQLiteJobRepository", () => {
       }
     };
 
-    repository.upsertDiscoveredJob(candidate.job);
-    repository.saveScoredJob(candidate);
+    await repository.upsertDiscoveredJob(candidate.job);
+    await repository.saveScoredJob(candidate);
 
-    const matches = repository.listMatchedJobs();
+    const matches = await repository.listMatchedJobs();
 
     expect(matches).toHaveLength(1);
     expect(matches[0]).toMatchObject({
@@ -261,10 +248,8 @@ describe("SQLiteJobRepository", () => {
     });
   });
 
-  test("upserts fully hydrated jobs and preserves imported timestamps", () => {
-    const repository = createRepository();
-
-    repository.upsertStoredJob({
+  test("upserts fully hydrated jobs and preserves imported timestamps", async () => {
+    await repository.upsertStoredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -281,7 +266,8 @@ describe("SQLiteJobRepository", () => {
       updatedAt: "2024-01-03T00:00:00.000Z"
     });
 
-    expect(repository.listJobs()).toEqual([
+    const jobs = await repository.listJobs();
+    expect(jobs).toEqual([
       expect.objectContaining({
         externalId: "justjoinit:/job-offer/acme",
         status: "matched",
@@ -292,11 +278,10 @@ describe("SQLiteJobRepository", () => {
     ]);
   });
 
-  test("updates applied and interested status properly", () => {
-    const repository = createRepository();
+  test("updates applied and interested status properly", async () => {
     const externalId = "justjoinit:/job-offer/acme";
 
-    repository.upsertStoredJob({
+    await repository.upsertStoredJob({
       externalId,
       source: "justjoinit",
       url: "https://justjoin.it/job-offer/acme",
@@ -308,25 +293,29 @@ describe("SQLiteJobRepository", () => {
     });
 
     // default values
-    let job = repository.listJobs()[0];
+    let jobs = await repository.listJobs();
+    let job = jobs[0];
     expect(job.isApplied).toBe(false);
     expect(job.isNotInterested).toBe(false);
     expect(job.appliedAt).toBeUndefined();
 
     // mark as applied
-    repository.updateJobAppliedStatus(externalId, true);
-    job = repository.listJobs()[0];
+    await repository.updateJobAppliedStatus(externalId, true);
+    jobs = await repository.listJobs();
+    job = jobs[0];
     expect(job.isApplied).toBe(true);
     expect(job.appliedAt).toBeTypeOf("string");
 
     // mark as not interested
-    repository.updateJobInterestedStatus(externalId, true);
-    job = repository.listJobs()[0];
+    await repository.updateJobInterestedStatus(externalId, true);
+    jobs = await repository.listJobs();
+    job = jobs[0];
     expect(job.isNotInterested).toBe(true);
 
     // mark as not applied
-    repository.updateJobAppliedStatus(externalId, false);
-    job = repository.listJobs()[0];
+    await repository.updateJobAppliedStatus(externalId, false);
+    jobs = await repository.listJobs();
+    job = jobs[0];
     expect(job.isApplied).toBe(false);
     expect(job.appliedAt).toBeUndefined();
   });
