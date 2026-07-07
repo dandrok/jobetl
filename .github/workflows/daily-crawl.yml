@@ -45,7 +45,7 @@ jobs:
         run: echo "${{ secrets.CV_MARKDOWN }}" > cv.md
 
       - name: Push Database Schema
-        run: npx drizzle-kit push --dialect=postgresql --schema=./src/storage/schema.ts --url=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl
+        run: npx drizzle-kit push --force --dialect=postgresql --schema=./src/storage/schema.ts --url=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl
 
       - name: Hydrate Postgres from Notion
         run: npm run import:notion

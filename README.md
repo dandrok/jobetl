@@ -120,7 +120,10 @@ cp cv.example.md cv.md
 
 Then:
 
-1. Fill `.env` with your keys.
+1. Fill `.env` with your keys and set `DATABASE_URL` to point to your local PostgreSQL instance:
+   ```env
+   DATABASE_URL=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl
+   ```
 2. Update `resumeMarkdownPath` in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts) to `./cv.md`.
 3. Adjust source filters, `matchThreshold`, and concurrency in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
 4. Start your local database:

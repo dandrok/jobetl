@@ -48,8 +48,7 @@ jobs:
       - name: Create test database
         run: |
           docker exec ${{ job.services.postgres.id }} psql -U jobetl_user -d jobetl -c "CREATE DATABASE jobetl_test OWNER jobetl_user;"
-          docker exec ${{ job.services.postgres.id }} psql -U jobetl_user -d jobetl -c "GRANT ALL PRIVILEGES ON DATABASE jobetl_test TO jobetl_user;"
-          npx drizzle-kit push --dialect=postgresql --schema=./src/storage/schema.ts --url=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl_test
+          npx drizzle-kit push --force --dialect=postgresql --schema=./src/storage/schema.ts --url=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl_test
 
       - name: Run unit tests
         run: npm run test

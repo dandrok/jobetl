@@ -129,6 +129,7 @@ export function startServer() {
   const shutdown = () => {
     console.log("\n🛑 Shutting down HTTP server gracefully...");
     server.close(async (err) => {
+      let hasError = !!err;
       if (err) {
         console.error("Error shutting down server:", err);
       }
@@ -137,8 +138,9 @@ export function startServer() {
         console.log("🔌 Database connections closed successfully.");
       } catch (dbErr) {
         console.error("Error closing database connections:", dbErr);
+        hasError = true;
       }
-      process.exit(err ? 1 : 0);
+      process.exit(hasError ? 1 : 0);
     });
   };
 
