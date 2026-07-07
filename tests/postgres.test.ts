@@ -4,7 +4,11 @@ import postgres from "postgres";
 import { PostgresJobRepository } from "@storage/postgres-job-repository";
 import type { MatchCandidate } from "@core/types";
 
-const connectionString = "postgres://jobetl_user:secure_password_here@localhost:5432/jobetl_test";
+const baseConnectionString =
+  process.env.DATABASE_URL || "postgres://jobetl_user:secure_password_here@localhost:5432/jobetl";
+const connectionString = baseConnectionString.endsWith("/jobetl")
+  ? baseConnectionString.replace(/\/jobetl$/, "/jobetl_test")
+  : baseConnectionString;
 const sql = postgres(connectionString);
 const repository = new PostgresJobRepository(connectionString);
 
@@ -68,7 +72,7 @@ describe("PostgresJobRepository", () => {
     const jobs1 = await repository.listJobs();
     const firstUpdatedAt = jobs1[0].updatedAt;
 
-    await sleep(2);
+    await sleep(50);
     await repository.upsertDiscoveredJob(listing);
 
     const jobs2 = await repository.listJobs();
@@ -91,7 +95,7 @@ describe("PostgresJobRepository", () => {
     const jobs1 = await repository.listJobs();
     const firstUpdatedAt = jobs1[0].updatedAt;
 
-    await sleep(2);
+    await sleep(50);
     await repository.upsertDiscoveredJob({
       externalId: "justjoinit:/job-offer/acme",
       source: "justjoinit",

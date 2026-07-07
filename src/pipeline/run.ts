@@ -212,18 +212,22 @@ export async function runPipeline(
   };
   const listingsToProcess: JobListing[] = [];
 
-  for (const listing of listings) {
-    await dependencies.repository.upsertDiscoveredJob(listing);
-
-    const currentStatus = await dependencies.repository.getJobStatus(listing.externalId);
-    if (currentStatus === "matched" || currentStatus === "rejected") {
-      summary.skipped += 1;
-      snapshot.skipped += 1;
-      continue;
-    }
-
-    listingsToProcess.push(listing);
-    snapshot.queuedFetch += 1;
+  const batchSize = 10;
+  for (let i = 0; i < listings.length; i += batchSize) {
+    const batch = listings.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (listing) => {
+        await dependencies.repository.upsertDiscoveredJob(listing);
+        const currentStatus = await dependencies.repository.getJobStatus(listing.externalId);
+        if (currentStatus === "matched" || currentStatus === "rejected") {
+          summary.skipped += 1;
+          snapshot.skipped += 1;
+        } else {
+          listingsToProcess.push(listing);
+          snapshot.queuedFetch += 1;
+        }
+      })
+    );
   }
   emitSnapshot("update");
 

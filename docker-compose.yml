@@ -5,9 +5,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: jobetl_user
-      POSTGRES_PASSWORD: secure_password_here
-      POSTGRES_DB: jobetl
+      POSTGRES_USER: ${POSTGRES_USER:-jobetl_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_here}
+      POSTGRES_DB: ${POSTGRES_DB:-jobetl}
     volumes:
       - jobetl_postgres_data:/var/lib/postgresql
       - ./data/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql

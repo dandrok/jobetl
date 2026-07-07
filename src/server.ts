@@ -57,8 +57,20 @@ export function startServer() {
         req.on("end", () => {
           if (tooLarge) return;
           (async () => {
+            interface StatusPatchPayload {
+              isApplied?: boolean;
+              isNotInterested?: boolean;
+            }
+            let data: StatusPatchPayload;
             try {
-              const data = JSON.parse(body);
+              data = JSON.parse(body) as StatusPatchPayload;
+            } catch {
+              res.writeHead(400);
+              res.end("Bad Request: Invalid JSON");
+              return;
+            }
+
+            try {
               let updated = false;
               let handled = false;
 
@@ -89,9 +101,9 @@ export function startServer() {
                 res.end("Bad Request");
               }
             } catch (e: unknown) {
-              console.error("Failed to update job status:", e);
-              res.writeHead(400);
-              res.end("Bad Request");
+              console.error("Failed to update job status in DB:", e);
+              res.writeHead(500);
+              res.end("Internal Server Error");
             }
           })();
         });
@@ -113,4 +125,23 @@ export function startServer() {
   server.listen(3001, () => {
     console.log("✨ JobETL Backend API is running at http://localhost:3001");
   });
+
+  const shutdown = () => {
+    console.log("\n🛑 Shutting down HTTP server gracefully...");
+    server.close(async (err) => {
+      if (err) {
+        console.error("Error shutting down server:", err);
+      }
+      try {
+        await repository.close();
+        console.log("🔌 Database connections closed successfully.");
+      } catch (dbErr) {
+        console.error("Error closing database connections:", dbErr);
+      }
+      process.exit(err ? 1 : 0);
+    });
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
