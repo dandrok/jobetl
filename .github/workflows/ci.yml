@@ -9,6 +9,20 @@ on:
 jobs:
   build-test-lint:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: jobetl_user
+          POSTGRES_PASSWORD: secure_password_here
+          POSTGRES_DB: jobetl
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -31,8 +45,16 @@ jobs:
       - name: Verify TypeScript build
         run: npm run build
 
+      - name: Create test database
+        run: |
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -c "CREATE DATABASE jobetl_test OWNER jobetl_user;"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE jobetl_test TO jobetl_user;"
+          npx drizzle-kit push --dialect=postgresql --schema=./src/storage/schema.ts --url=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl_test
+
       - name: Run unit tests
         run: npm run test
+        env:
+          DATABASE_URL: postgres://jobetl_user:secure_password_here@localhost:5432/jobetl_test
 
       - name: Verify UI build
         run: npm run build:ui
