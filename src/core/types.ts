@@ -126,7 +126,7 @@ export interface SourceConfigMap {
 export type SourceConfigFor<T extends JobSource> = SourceConfigMap[T];
 
 export interface RunConfig {
-  databasePath: string;
+  databaseUrl: string;
   resumeMarkdownPath: string;
   matchThreshold: number;
   fetchConcurrency: number;

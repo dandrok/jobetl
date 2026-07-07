@@ -1,9 +1,9 @@
 import { createServer } from "node:http";
 import { config } from "@core/config";
-import { SQLiteJobRepository } from "@storage/sqlite-job-repository";
+import { PostgresJobRepository } from "@storage/postgres-job-repository";
 
 export function startServer() {
-  const repository = new SQLiteJobRepository(config.databasePath);
+  const repository = new PostgresJobRepository(config.databaseUrl);
 
   const server = createServer((req, res) => {
     // Add basic CORS headers for local development if Vite is running on a different port
@@ -18,11 +18,18 @@ export function startServer() {
     }
 
     if (req.url === "/api/jobs" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      const jobs = repository
-        .listJobs()
-        .filter((j) => j.status === "matched" || j.status === "rejected");
-      res.end(JSON.stringify(jobs));
+      (async () => {
+        try {
+          const jobs = await repository.listJobs();
+          const filtered = jobs.filter((j) => j.status === "matched" || j.status === "rejected");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(filtered));
+        } catch (e: unknown) {
+          console.error("Failed to list jobs:", e);
+          res.writeHead(500);
+          res.end("Internal Server Error");
+        }
+      })();
     } else if (req.url?.startsWith("/api/jobs/") && req.method === "PATCH") {
       const match = req.url.match(/^\/api\/jobs\/([^/]+)$/);
       if (match) {
@@ -49,38 +56,44 @@ export function startServer() {
         });
         req.on("end", () => {
           if (tooLarge) return;
-          try {
-            const data = JSON.parse(body);
-            let updated = false;
-            let handled = false;
+          (async () => {
+            try {
+              const data = JSON.parse(body);
+              let updated = false;
+              let handled = false;
 
-            if (typeof data.isApplied === "boolean") {
-              const resApplied = repository.updateJobAppliedStatus(id, data.isApplied);
-              updated = updated || resApplied;
-              handled = true;
-            }
-            if (typeof data.isNotInterested === "boolean") {
-              const resInterested = repository.updateJobInterestedStatus(id, data.isNotInterested);
-              updated = updated || resInterested;
-              handled = true;
-            }
-
-            if (handled) {
-              if (updated) {
-                res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ success: true }));
-              } else {
-                res.writeHead(404);
-                res.end("Not found");
+              if (typeof data.isApplied === "boolean") {
+                const resApplied = await repository.updateJobAppliedStatus(id, data.isApplied);
+                updated = updated || resApplied;
+                handled = true;
               }
-            } else {
+              if (typeof data.isNotInterested === "boolean") {
+                const resInterested = await repository.updateJobInterestedStatus(
+                  id,
+                  data.isNotInterested
+                );
+                updated = updated || resInterested;
+                handled = true;
+              }
+
+              if (handled) {
+                if (updated) {
+                  res.writeHead(200, { "Content-Type": "application/json" });
+                  res.end(JSON.stringify({ success: true }));
+                } else {
+                  res.writeHead(404);
+                  res.end("Not found");
+                }
+              } else {
+                res.writeHead(400);
+                res.end("Bad Request");
+              }
+            } catch (e: unknown) {
+              console.error("Failed to update job status:", e);
               res.writeHead(400);
               res.end("Bad Request");
             }
-          } catch {
-            res.writeHead(400);
-            res.end("Bad Request");
-          }
+          })();
         });
         return;
       }

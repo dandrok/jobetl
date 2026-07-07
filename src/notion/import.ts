@@ -4,7 +4,7 @@ import { mapNotionPageToStoredJob } from "@notion/mapper";
 import type { NotionJobDatabaseSchema } from "@notion/schema";
 
 export interface StoredJobWriter {
-  upsertStoredJob(job: StoredJob): void;
+  upsertStoredJob(job: StoredJob): Promise<void>;
 }
 
 export interface NotionImportClient {
@@ -50,7 +50,7 @@ export async function importJobsFromNotion(
       }
 
       try {
-        repository.upsertStoredJob(job);
+        await repository.upsertStoredJob(job);
         summary.imported += 1;
       } catch (error: unknown) {
         summary.failed += 1;

@@ -7,7 +7,7 @@ import type { ProgressReporter } from "@progress/ora-progress-reporter";
 import { createSourceAdapters } from "@scrapers/index";
 import { selectSources } from "@scrapers/select";
 import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
-import { SQLiteJobRepository } from "@storage/sqlite-job-repository";
+import { PostgresJobRepository } from "@storage/postgres-job-repository";
 import { AsyncQueue } from "@pipeline/async-queue";
 import type {
   JobListing,
@@ -31,13 +31,13 @@ export interface RunSummary {
 }
 
 export interface PipelineRepository {
-  upsertDiscoveredJob(job: JobListing): void;
-  getJobStatus(externalId: string): JobStatus | undefined;
-  markJobFetching(externalId: string): void;
-  saveFetchedOffer(externalId: string, offerMarkdown: string): void;
-  markJobScoring(externalId: string): void;
-  markJobError(externalId: string): void;
-  saveScoredJob(candidate: MatchCandidate): void;
+  upsertDiscoveredJob(job: JobListing): Promise<void>;
+  getJobStatus(externalId: string): Promise<JobStatus | undefined>;
+  markJobFetching(externalId: string): Promise<void>;
+  saveFetchedOffer(externalId: string, offerMarkdown: string): Promise<void>;
+  markJobScoring(externalId: string): Promise<void>;
+  markJobError(externalId: string): Promise<void>;
+  saveScoredJob(candidate: MatchCandidate): Promise<void>;
 }
 
 export interface PipelineDependencies {
@@ -46,7 +46,7 @@ export interface PipelineDependencies {
   loadResumeMarkdown(path: string): Promise<string>;
   fetchOfferMarkdown(url: string): Promise<string>;
   scoreOffer(job: JobOffer, resumeMarkdown: string): Promise<MatchResult>;
-  countStoredJobs(): number;
+  countStoredJobs(): Promise<number>;
   repository: PipelineRepository;
 }
 
@@ -103,9 +103,12 @@ function createPipelineDependencies(
   config: RunConfig,
   overrides: Partial<PipelineDependencies> = {}
 ): PipelineDependencies {
-  const defaultRepository = new SQLiteJobRepository(config.databasePath);
-  const defaultCountStoredJobs = (): number => defaultRepository.listJobs().length;
-  const missingCountStoredJobs = (): number => {
+  const defaultRepository = new PostgresJobRepository(config.databaseUrl);
+  const defaultCountStoredJobs = async (): Promise<number> => {
+    const jobs = await defaultRepository.listJobs();
+    return jobs.length;
+  };
+  const missingCountStoredJobs = async (): Promise<number> => {
     throw new Error(
       "Pipeline countStoredJobs dependency is required when using a custom repository"
     );
@@ -210,9 +213,9 @@ export async function runPipeline(
   const listingsToProcess: JobListing[] = [];
 
   for (const listing of listings) {
-    dependencies.repository.upsertDiscoveredJob(listing);
+    await dependencies.repository.upsertDiscoveredJob(listing);
 
-    const currentStatus = dependencies.repository.getJobStatus(listing.externalId);
+    const currentStatus = await dependencies.repository.getJobStatus(listing.externalId);
     if (currentStatus === "matched" || currentStatus === "rejected") {
       summary.skipped += 1;
       snapshot.skipped += 1;
@@ -249,9 +252,9 @@ export async function runPipeline(
       let queuedForScore = false;
 
       try {
-        dependencies.repository.markJobFetching(listing.externalId);
+        await dependencies.repository.markJobFetching(listing.externalId);
         const offerMarkdown = await dependencies.fetchOfferMarkdown(listing.url);
-        dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+        await dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
 
         summary.fetched += 1;
         snapshot.fetching -= 1;
@@ -268,7 +271,14 @@ export async function runPipeline(
           activeFetchCompanies.delete(listing.externalId);
         }
 
-        dependencies.repository.markJobError(listing.externalId);
+        try {
+          await dependencies.repository.markJobError(listing.externalId);
+        } catch (markError) {
+          console.error(
+            `\nFailed to mark job error for ${listing.company} (${listing.url}):`,
+            markError instanceof Error ? markError.message : String(markError)
+          );
+        }
         summary.failed += 1;
         snapshot.failed += 1;
         emitSnapshot("update");
@@ -294,7 +304,7 @@ export async function runPipeline(
       emitSnapshot("update");
 
       try {
-        dependencies.repository.markJobScoring(offer.externalId);
+        await dependencies.repository.markJobScoring(offer.externalId);
         const resumeMarkdown = await getResumeMarkdown();
         const match = await dependencies.scoreOffer(offer, resumeMarkdown);
         const candidate: MatchCandidate = {
@@ -305,7 +315,7 @@ export async function runPipeline(
           }
         };
 
-        dependencies.repository.saveScoredJob(candidate);
+        await dependencies.repository.saveScoredJob(candidate);
         snapshot.scoring -= 1;
         activeScoreCompanies.delete(offer.externalId);
         if (candidate.match.shouldSave) {
@@ -319,7 +329,14 @@ export async function runPipeline(
       } catch (error) {
         snapshot.scoring -= 1;
         activeScoreCompanies.delete(offer.externalId);
-        dependencies.repository.markJobError(offer.externalId);
+        try {
+          await dependencies.repository.markJobError(offer.externalId);
+        } catch (markError) {
+          console.error(
+            `\nFailed to mark job error for ${offer.company} (${offer.url}):`,
+            markError instanceof Error ? markError.message : String(markError)
+          );
+        }
         summary.failed += 1;
         snapshot.failed += 1;
         emitSnapshot("update");
@@ -357,7 +374,7 @@ export async function runPipeline(
 
   await Promise.all(scoreWorkers);
 
-  summary.stored = dependencies.countStoredJobs();
+  summary.stored = await dependencies.countStoredJobs();
   snapshot.stage = "done";
   emitSnapshot("update");
 
