@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   derivePipelineStage,
@@ -7,7 +7,14 @@ import {
 } from "@progress/formatters";
 import type { PipelineProgressSnapshot } from "@core/types";
 
+let logSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+});
+
 afterEach(() => {
+  logSpy.mockRestore();
   vi.doUnmock("ora");
   vi.resetModules();
 });

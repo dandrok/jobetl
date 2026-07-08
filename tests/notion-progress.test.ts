@@ -1,7 +1,17 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { formatNotionSyncProgressText } from "@notion/formatters";
 import type { NotionSyncProgressSnapshot } from "@notion/sync";
+
+let logSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  logSpy.mockRestore();
+});
 
 function createSnapshot(
   overrides: Partial<NotionSyncProgressSnapshot> = {}
