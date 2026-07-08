@@ -4,13 +4,25 @@ import { formatNotionSyncProgressText } from "@notion/formatters";
 import type { NotionSyncProgressSnapshot } from "@notion/sync";
 
 let logSpy: ReturnType<typeof vi.spyOn>;
+let originalCI: string | undefined;
+let originalTTY: boolean | undefined;
 
 beforeEach(() => {
   logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  originalCI = process.env.CI;
+  originalTTY = process.stdout.isTTY;
+  delete process.env.CI;
+  process.stdout.isTTY = true;
 });
 
 afterEach(() => {
   logSpy.mockRestore();
+  if (originalCI === undefined) {
+    delete process.env.CI;
+  } else {
+    process.env.CI = originalCI;
+  }
+  process.stdout.isTTY = originalTTY;
 });
 
 function createSnapshot(
@@ -36,8 +48,6 @@ describe("notion sync progress", () => {
 
   test("notion sync reporter uses snapshot-based start and update text", async () => {
     const writeMock = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const originalTTY = process.stdout.isTTY;
-    process.stdout.isTTY = true;
 
     try {
       const { NotionSyncProgressReporter } = await import("@notion/progress-reporter");
@@ -71,7 +81,6 @@ describe("notion sync progress", () => {
       reporter.fail("failed");
       expect(writeMock).toHaveBeenCalled();
     } finally {
-      process.stdout.isTTY = originalTTY;
       writeMock.mockRestore();
     }
   });

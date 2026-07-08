@@ -8,13 +8,29 @@ import {
 import type { PipelineProgressSnapshot } from "@core/types";
 
 let logSpy: ReturnType<typeof vi.spyOn>;
+let originalCI: string | undefined;
+let originalTTY: boolean | undefined;
+let originalColumns: number | undefined;
 
 beforeEach(() => {
   logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  originalCI = process.env.CI;
+  originalTTY = process.stdout.isTTY;
+  originalColumns = process.stdout.columns;
+  delete process.env.CI;
+  process.stdout.isTTY = true;
+  process.stdout.columns = 100;
 });
 
 afterEach(() => {
   logSpy.mockRestore();
+  if (originalCI === undefined) {
+    delete process.env.CI;
+  } else {
+    process.env.CI = originalCI;
+  }
+  process.stdout.isTTY = originalTTY;
+  process.stdout.columns = originalColumns;
   vi.doUnmock("ora");
   vi.resetModules();
 });
@@ -112,8 +128,6 @@ describe("progress formatters", () => {
 
   test("single line progress reporter uses snapshot-based start and update text", async () => {
     const writeMock = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const originalTTY = process.stdout.isTTY;
-    process.stdout.isTTY = true;
 
     try {
       const { SingleLineProgressReporter } =
@@ -155,17 +169,12 @@ describe("progress formatters", () => {
       reporter.fail("failed");
       expect(writeMock).toHaveBeenCalled();
     } finally {
-      process.stdout.isTTY = originalTTY;
       writeMock.mockRestore();
     }
   });
 
   test("multiline progress reporter updates and clears stdout", async () => {
     const writeMock = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const originalTTY = process.stdout.isTTY;
-    const originalColumns = process.stdout.columns;
-    process.stdout.isTTY = true;
-    process.stdout.columns = 100;
 
     try {
       const { MultilineProgressReporter } = await import("@progress/multiline-progress-reporter");
@@ -189,8 +198,6 @@ describe("progress formatters", () => {
       reporter.fail("fail");
       expect(writeMock).toHaveBeenCalled();
     } finally {
-      process.stdout.isTTY = originalTTY;
-      process.stdout.columns = originalColumns;
       writeMock.mockRestore();
     }
   });
