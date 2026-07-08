@@ -1,2 +1,3 @@
 export * from "./formatters";
-export * from "./ora-progress-reporter";
+export * from "./single-line-progress-reporter";
+export * from "./multiline-progress-reporter";

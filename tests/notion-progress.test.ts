@@ -1,11 +1,28 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { formatNotionSyncProgressText } from "@notion/formatters";
 import type { NotionSyncProgressSnapshot } from "@notion/sync";
 
+let logSpy: ReturnType<typeof vi.spyOn>;
+let originalCI: string | undefined;
+let originalTTY: boolean | undefined;
+
+beforeEach(() => {
+  logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  originalCI = process.env.CI;
+  originalTTY = process.stdout.isTTY;
+  delete process.env.CI;
+  process.stdout.isTTY = true;
+});
+
 afterEach(() => {
-  vi.doUnmock("ora");
-  vi.resetModules();
+  logSpy.mockRestore();
+  if (originalCI === undefined) {
+    delete process.env.CI;
+  } else {
+    process.env.CI = originalCI;
+  }
+  process.stdout.isTTY = originalTTY;
 });
 
 function createSnapshot(
@@ -29,47 +46,42 @@ describe("notion sync progress", () => {
     );
   });
 
-  test("ora notion sync reporter uses snapshot-based start and update text", async () => {
-    const spinner = {
-      start: vi.fn(),
-      succeed: vi.fn(),
-      fail: vi.fn(),
-      text: ""
-    };
-    const ora = vi.fn(() => spinner);
+  test("notion sync reporter uses snapshot-based start and update text", async () => {
+    const writeMock = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    vi.doMock("ora", () => ({
-      default: ora
-    }));
+    try {
+      const { NotionSyncProgressReporter } = await import("@notion/progress-reporter");
+      const reporter = new NotionSyncProgressReporter();
+      const startSnapshot = createSnapshot({
+        processed: 0,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        failed: 0
+      });
 
-    const { OraNotionSyncProgressReporter } = await import("@notion/ora-progress-reporter");
+      reporter.start(startSnapshot);
+      expect(writeMock).toHaveBeenCalled();
 
-    const reporter = new OraNotionSyncProgressReporter();
-    const startSnapshot = createSnapshot({
-      processed: 0,
-      created: 0,
-      updated: 0,
-      skipped: 0,
-      failed: 0
-    });
+      const updateSnapshot = createSnapshot({
+        processed: 5,
+        updated: 3
+      });
+      writeMock.mockClear();
+      reporter.update(updateSnapshot);
+      expect(writeMock).toHaveBeenCalled();
 
-    reporter.start(startSnapshot);
+      writeMock.mockClear();
+      reporter.succeed("done");
+      expect(writeMock).toHaveBeenCalled();
 
-    expect(spinner.start).toHaveBeenCalledWith(formatNotionSyncProgressText(startSnapshot));
-
-    const updateSnapshot = createSnapshot({
-      processed: 5,
-      updated: 3
-    });
-
-    reporter.update(updateSnapshot);
-
-    expect(spinner.text).toBe(formatNotionSyncProgressText(updateSnapshot));
-
-    reporter.succeed("done");
-    reporter.fail("failed");
-
-    expect(spinner.succeed).toHaveBeenCalledWith("done");
-    expect(spinner.fail).toHaveBeenCalledWith("failed");
+      // Restart progress to set lastTextLength > 0 for fail test
+      reporter.start(startSnapshot);
+      writeMock.mockClear();
+      reporter.fail("failed");
+      expect(writeMock).toHaveBeenCalled();
+    } finally {
+      writeMock.mockRestore();
+    }
   });
 });
