@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { loadRuntimeEnv } from "@core/env";
 import { JinaReaderClient } from "@jina/client";
 import { DeepSeekMatcher } from "@matching/deepseek-matcher";
-import type { ProgressReporter } from "@progress/ora-progress-reporter";
+import type { ProgressReporter } from "@progress/single-line-progress-reporter";
 import { createSourceAdapters } from "@scrapers/index";
 import { selectSources } from "@scrapers/select";
 import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
@@ -168,219 +168,225 @@ export async function runPipeline(
   options: RunPipelineOptions = {}
 ): Promise<RunSummary> {
   const dependencies = createPipelineDependencies(config, dependencyOverrides);
-  const snapshot = createProgressSnapshot();
-  const activeFetchCompanies = new Map<string, string>();
-  const activeScoreCompanies = new Map<string, string>();
-  const emitSnapshot = (method: "start" | "update"): void => {
-    if (!progress) {
-      return;
-    }
-
-    const progressSnapshot: PipelineProgressSnapshot = {
-      ...snapshot,
-      activeFetchCompanies: Array.from(activeFetchCompanies.values()),
-      activeScoreCompanies: Array.from(activeScoreCompanies.values())
-    };
-
-    progress[method](progressSnapshot);
-  };
-  const selectedSources = selectSources(config, dependencies.adapters, options.source);
-  const discoveredListings = await Promise.all(
-    selectedSources.map((selectedSource) =>
-      discoverSource(selectedSource, dependencies.fetchListingHtml)
-    )
-  );
-  const listings = dedupeListings(discoveredListings.flat());
-  snapshot.discovered = listings.length;
-  emitSnapshot("start");
-  let resumeMarkdownPromise: Promise<string> | undefined;
-  const getResumeMarkdown = async (): Promise<string> => {
-    if (!resumeMarkdownPromise) {
-      resumeMarkdownPromise = dependencies.loadResumeMarkdown(config.resumeMarkdownPath);
-    }
-
-    return resumeMarkdownPromise;
-  };
-  const summary: RunSummary = {
-    scanned: listings.length,
-    skipped: 0,
-    fetched: 0,
-    matched: 0,
-    rejected: 0,
-    failed: 0,
-    stored: 0
-  };
-  const listingsToProcess: JobListing[] = [];
-
-  const batchSize = 10;
-  for (let i = 0; i < listings.length; i += batchSize) {
-    const batch = listings.slice(i, i + batchSize);
-    await Promise.all(
-      batch.map(async (listing) => {
-        await dependencies.repository.upsertDiscoveredJob(listing);
-        const currentStatus = await dependencies.repository.getJobStatus(listing.externalId);
-        if (currentStatus === "matched" || currentStatus === "rejected") {
-          summary.skipped += 1;
-          snapshot.skipped += 1;
-        } else {
-          listingsToProcess.push(listing);
-          snapshot.queuedFetch += 1;
-        }
-      })
-    );
-  }
-  emitSnapshot("update");
-
-  if (listingsToProcess.length > 0) {
-    await getResumeMarkdown();
-  }
-
-  const fetchWorkerCount = Math.max(config.fetchConcurrency, 1);
-  const scoreWorkerCount = Math.max(config.scoreConcurrency, 1);
-  const fetchQueue = new AsyncQueue<JobListing>(fetchWorkerCount);
-  const scoreQueue = new AsyncQueue<JobOffer>(scoreWorkerCount);
-
-  async function runFetchWorker(): Promise<void> {
-    while (true) {
-      const listing = await fetchQueue.dequeue();
-      if (!listing) {
+  try {
+    const snapshot = createProgressSnapshot();
+    const activeFetchCompanies = new Map<string, string>();
+    const activeScoreCompanies = new Map<string, string>();
+    const emitSnapshot = (method: "start" | "update"): void => {
+      if (!progress) {
         return;
       }
 
-      snapshot.stage = "fetching";
-      snapshot.queuedFetch -= 1;
-      snapshot.fetching += 1;
-      activeFetchCompanies.set(listing.externalId, listing.company);
-      emitSnapshot("update");
+      const progressSnapshot: PipelineProgressSnapshot = {
+        ...snapshot,
+        activeFetchCompanies: Array.from(activeFetchCompanies.values()),
+        activeScoreCompanies: Array.from(activeScoreCompanies.values())
+      };
 
-      let queuedForScore = false;
+      progress[method](progressSnapshot);
+    };
+    const selectedSources = selectSources(config, dependencies.adapters, options.source);
+    const discoveredListings = await Promise.all(
+      selectedSources.map((selectedSource) =>
+        discoverSource(selectedSource, dependencies.fetchListingHtml)
+      )
+    );
+    const listings = dedupeListings(discoveredListings.flat());
+    snapshot.discovered = listings.length;
+    emitSnapshot("start");
+    let resumeMarkdownPromise: Promise<string> | undefined;
+    const getResumeMarkdown = async (): Promise<string> => {
+      if (!resumeMarkdownPromise) {
+        resumeMarkdownPromise = dependencies.loadResumeMarkdown(config.resumeMarkdownPath);
+      }
 
-      try {
-        await dependencies.repository.markJobFetching(listing.externalId);
-        const offerMarkdown = await dependencies.fetchOfferMarkdown(listing.url);
-        await dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+      return resumeMarkdownPromise;
+    };
+    const summary: RunSummary = {
+      scanned: listings.length,
+      skipped: 0,
+      fetched: 0,
+      matched: 0,
+      rejected: 0,
+      failed: 0,
+      stored: 0
+    };
+    const listingsToProcess: JobListing[] = [];
 
-        summary.fetched += 1;
-        snapshot.fetching -= 1;
-        activeFetchCompanies.delete(listing.externalId);
-        snapshot.queuedScore += 1;
-        queuedForScore = true;
+    const batchSize = 10;
+    for (let i = 0; i < listings.length; i += batchSize) {
+      const batch = listings.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async (listing) => {
+          await dependencies.repository.upsertDiscoveredJob(listing);
+          const currentStatus = await dependencies.repository.getJobStatus(listing.externalId);
+          if (currentStatus === "matched" || currentStatus === "rejected") {
+            summary.skipped += 1;
+            snapshot.skipped += 1;
+          } else {
+            listingsToProcess.push(listing);
+            snapshot.queuedFetch += 1;
+          }
+        })
+      );
+    }
+    emitSnapshot("update");
+
+    if (listingsToProcess.length > 0) {
+      await getResumeMarkdown();
+    }
+
+    const fetchWorkerCount = Math.max(config.fetchConcurrency, 1);
+    const scoreWorkerCount = Math.max(config.scoreConcurrency, 1);
+    const fetchQueue = new AsyncQueue<JobListing>(fetchWorkerCount);
+    const scoreQueue = new AsyncQueue<JobOffer>(scoreWorkerCount);
+
+    async function runFetchWorker(): Promise<void> {
+      while (true) {
+        const listing = await fetchQueue.dequeue();
+        if (!listing) {
+          return;
+        }
+
+        snapshot.stage = "fetching";
+        snapshot.queuedFetch -= 1;
+        snapshot.fetching += 1;
+        activeFetchCompanies.set(listing.externalId, listing.company);
         emitSnapshot("update");
-        await scoreQueue.enqueue({ ...listing, offerMarkdown });
-      } catch (error) {
-        if (queuedForScore) {
-          snapshot.queuedScore -= 1;
-        } else {
+
+        let queuedForScore = false;
+
+        try {
+          await dependencies.repository.markJobFetching(listing.externalId);
+          const offerMarkdown = await dependencies.fetchOfferMarkdown(listing.url);
+          await dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+
+          summary.fetched += 1;
           snapshot.fetching -= 1;
           activeFetchCompanies.delete(listing.externalId);
-        }
-
-        try {
-          await dependencies.repository.markJobError(listing.externalId);
-        } catch (markError) {
-          console.error(
-            `\nFailed to mark job error for ${listing.company} (${listing.url}):`,
-            markError instanceof Error ? markError.message : String(markError)
-          );
-        }
-        summary.failed += 1;
-        snapshot.failed += 1;
-        emitSnapshot("update");
-        console.error(
-          `\nFailed to fetch offer for ${listing.company} (${listing.url}):`,
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    }
-  }
-
-  async function runScoreWorker(): Promise<void> {
-    while (true) {
-      const offer = await scoreQueue.dequeue();
-      if (!offer) {
-        return;
-      }
-
-      snapshot.stage = "scoring";
-      snapshot.queuedScore -= 1;
-      snapshot.scoring += 1;
-      activeScoreCompanies.set(offer.externalId, offer.company);
-      emitSnapshot("update");
-
-      try {
-        await dependencies.repository.markJobScoring(offer.externalId);
-        const resumeMarkdown = await getResumeMarkdown();
-        const match = await dependencies.scoreOffer(offer, resumeMarkdown);
-        const candidate: MatchCandidate = {
-          job: offer,
-          match: {
-            ...match,
-            shouldSave: match.score >= config.matchThreshold
+          snapshot.queuedScore += 1;
+          queuedForScore = true;
+          emitSnapshot("update");
+          await scoreQueue.enqueue({ ...listing, offerMarkdown });
+        } catch (error) {
+          if (queuedForScore) {
+            snapshot.queuedScore -= 1;
+          } else {
+            snapshot.fetching -= 1;
+            activeFetchCompanies.delete(listing.externalId);
           }
-        };
 
-        await dependencies.repository.saveScoredJob(candidate);
-        snapshot.scoring -= 1;
-        activeScoreCompanies.delete(offer.externalId);
-        if (candidate.match.shouldSave) {
-          summary.matched += 1;
-          snapshot.matched += 1;
-        } else {
-          summary.rejected += 1;
-          snapshot.rejected += 1;
-        }
-        emitSnapshot("update");
-      } catch (error) {
-        snapshot.scoring -= 1;
-        activeScoreCompanies.delete(offer.externalId);
-        try {
-          await dependencies.repository.markJobError(offer.externalId);
-        } catch (markError) {
+          try {
+            await dependencies.repository.markJobError(listing.externalId);
+          } catch (markError) {
+            console.error(
+              `\nFailed to mark job error for ${listing.company} (${listing.url}):`,
+              markError instanceof Error ? markError.message : String(markError)
+            );
+          }
+          summary.failed += 1;
+          snapshot.failed += 1;
+          emitSnapshot("update");
           console.error(
-            `\nFailed to mark job error for ${offer.company} (${offer.url}):`,
-            markError instanceof Error ? markError.message : String(markError)
-          );
-        }
-        summary.failed += 1;
-        snapshot.failed += 1;
-        emitSnapshot("update");
-        console.error(
-          `\nFailed to score offer for ${offer.company} (${offer.url}):`,
-          error instanceof Error ? error.message : String(error)
-        );
-
-        if (isFatalDeepSeekError(error)) {
-          throw new Error(
-            `Fatal DeepSeek API Error: ${error instanceof Error ? error.message : String(error)}. Aborting pipeline.`,
-            { cause: error }
+            `\nFailed to fetch offer for ${listing.company} (${listing.url}):`,
+            error instanceof Error ? error.message : String(error)
           );
         }
       }
     }
-  }
 
-  const scoreWorkers = Array.from({ length: scoreWorkerCount }, () => runScoreWorker());
-  const fetchWorkers = Array.from({ length: fetchWorkerCount }, () => runFetchWorker());
+    async function runScoreWorker(): Promise<void> {
+      while (true) {
+        const offer = await scoreQueue.dequeue();
+        if (!offer) {
+          return;
+        }
 
-  try {
-    for (const listing of listingsToProcess) {
-      await fetchQueue.enqueue(listing);
+        snapshot.stage = "scoring";
+        snapshot.queuedScore -= 1;
+        snapshot.scoring += 1;
+        activeScoreCompanies.set(offer.externalId, offer.company);
+        emitSnapshot("update");
+
+        try {
+          await dependencies.repository.markJobScoring(offer.externalId);
+          const resumeMarkdown = await getResumeMarkdown();
+          const match = await dependencies.scoreOffer(offer, resumeMarkdown);
+          const candidate: MatchCandidate = {
+            job: offer,
+            match: {
+              ...match,
+              shouldSave: match.score >= config.matchThreshold
+            }
+          };
+
+          await dependencies.repository.saveScoredJob(candidate);
+          snapshot.scoring -= 1;
+          activeScoreCompanies.delete(offer.externalId);
+          if (candidate.match.shouldSave) {
+            summary.matched += 1;
+            snapshot.matched += 1;
+          } else {
+            summary.rejected += 1;
+            snapshot.rejected += 1;
+          }
+          emitSnapshot("update");
+        } catch (error) {
+          snapshot.scoring -= 1;
+          activeScoreCompanies.delete(offer.externalId);
+          try {
+            await dependencies.repository.markJobError(offer.externalId);
+          } catch (markError) {
+            console.error(
+              `\nFailed to mark job error for ${offer.company} (${offer.url}):`,
+              markError instanceof Error ? markError.message : String(markError)
+            );
+          }
+          summary.failed += 1;
+          snapshot.failed += 1;
+          emitSnapshot("update");
+          console.error(
+            `\nFailed to score offer for ${offer.company} (${offer.url}):`,
+            error instanceof Error ? error.message : String(error)
+          );
+
+          if (isFatalDeepSeekError(error)) {
+            throw new Error(
+              `Fatal DeepSeek API Error: ${error instanceof Error ? error.message : String(error)}. Aborting pipeline.`,
+              { cause: error }
+            );
+          }
+        }
+      }
     }
+
+    const scoreWorkers = Array.from({ length: scoreWorkerCount }, () => runScoreWorker());
+    const fetchWorkers = Array.from({ length: fetchWorkerCount }, () => runFetchWorker());
+
+    try {
+      for (const listing of listingsToProcess) {
+        await fetchQueue.enqueue(listing);
+      }
+    } finally {
+      fetchQueue.close();
+    }
+
+    try {
+      await Promise.all(fetchWorkers);
+    } finally {
+      scoreQueue.close();
+    }
+
+    await Promise.all(scoreWorkers);
+
+    summary.stored = await dependencies.countStoredJobs();
+    snapshot.stage = "done";
+    emitSnapshot("update");
+
+    return summary;
   } finally {
-    fetchQueue.close();
+    if (!dependencyOverrides.repository) {
+      await dependencies.repository.close();
+    }
   }
-
-  try {
-    await Promise.all(fetchWorkers);
-  } finally {
-    scoreQueue.close();
-  }
-
-  await Promise.all(scoreWorkers);
-
-  summary.stored = await dependencies.countStoredJobs();
-  snapshot.stage = "done";
-  emitSnapshot("update");
-
-  return summary;
 }

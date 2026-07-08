@@ -103,52 +103,88 @@ describe("progress formatters", () => {
     );
   });
 
-  test("ora progress reporter uses snapshot-based start and update text", async () => {
-    const spinner = {
-      start: vi.fn(),
-      succeed: vi.fn(),
-      fail: vi.fn(),
-      text: ""
-    };
-    const ora = vi.fn(() => spinner);
+  test("single line progress reporter uses snapshot-based start and update text", async () => {
+    const writeMock = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const originalTTY = process.stdout.isTTY;
+    process.stdout.isTTY = true;
 
-    vi.doMock("ora", () => ({
-      default: ora
-    }));
+    try {
+      const { SingleLineProgressReporter } =
+        await import("@progress/single-line-progress-reporter");
 
-    const { OraProgressReporter } = await import("@progress/ora-progress-reporter");
+      const reporter = new SingleLineProgressReporter();
+      const startSnapshot = createSnapshot({
+        stage: "discovering",
+        fetching: 0,
+        scoring: 0,
+        activeFetchCompanies: [],
+        activeScoreCompanies: []
+      });
+      reporter.start(startSnapshot);
 
-    const reporter = new OraProgressReporter();
-    const startSnapshot = createSnapshot({
-      stage: "discovering",
-      fetching: 0,
-      scoring: 0,
-      activeFetchCompanies: [],
-      activeScoreCompanies: []
-    });
-    reporter.start(startSnapshot);
+      expect(writeMock).toHaveBeenCalled();
 
-    expect(spinner.start).toHaveBeenCalledWith(
-      `${formatRunStartText(startSnapshot.discovered)} | ${formatPipelineProgressText(startSnapshot)}`
-    );
+      const updateSnapshot = createSnapshot({
+        stage: "fetching",
+        queuedFetch: 1,
+        fetching: 1,
+        queuedScore: 0,
+        scoring: 0,
+        activeFetchCompanies: ["Gamma"],
+        activeScoreCompanies: []
+      });
+      writeMock.mockClear();
+      reporter.update(updateSnapshot);
 
-    const updateSnapshot = createSnapshot({
-      stage: "fetching",
-      queuedFetch: 1,
-      fetching: 1,
-      queuedScore: 0,
-      scoring: 0,
-      activeFetchCompanies: ["Gamma"],
-      activeScoreCompanies: []
-    });
-    reporter.update(updateSnapshot);
+      expect(writeMock).toHaveBeenCalled();
 
-    expect(spinner.text).toBe(formatPipelineProgressText(updateSnapshot));
+      writeMock.mockClear();
+      reporter.succeed("done");
+      expect(writeMock).toHaveBeenCalled();
 
-    reporter.succeed("done");
-    reporter.fail("failed");
+      // Restart progress to ensure lastTextLength > 0 for fail test
+      reporter.start(startSnapshot);
+      writeMock.mockClear();
+      reporter.fail("failed");
+      expect(writeMock).toHaveBeenCalled();
+    } finally {
+      process.stdout.isTTY = originalTTY;
+      writeMock.mockRestore();
+    }
+  });
 
-    expect(spinner.succeed).toHaveBeenCalledWith("done");
-    expect(spinner.fail).toHaveBeenCalledWith("failed");
+  test("multiline progress reporter updates and clears stdout", async () => {
+    const writeMock = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const originalTTY = process.stdout.isTTY;
+    const originalColumns = process.stdout.columns;
+    process.stdout.isTTY = true;
+    process.stdout.columns = 100;
+
+    try {
+      const { MultilineProgressReporter } = await import("@progress/multiline-progress-reporter");
+      const reporter = new MultilineProgressReporter();
+      const snapshot = createSnapshot();
+
+      reporter.start(snapshot);
+      expect(writeMock).toHaveBeenCalled();
+
+      writeMock.mockClear();
+      reporter.update(snapshot);
+      expect(writeMock).toHaveBeenCalled();
+
+      writeMock.mockClear();
+      reporter.succeed("success");
+      expect(writeMock).toHaveBeenCalled();
+
+      writeMock.mockClear();
+      reporter.start(snapshot);
+      writeMock.mockClear();
+      reporter.fail("fail");
+      expect(writeMock).toHaveBeenCalled();
+    } finally {
+      process.stdout.isTTY = originalTTY;
+      process.stdout.columns = originalColumns;
+      writeMock.mockRestore();
+    }
   });
 });

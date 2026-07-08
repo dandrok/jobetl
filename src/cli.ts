@@ -1,10 +1,10 @@
 import { parseCliOptions } from "@core/cli-options";
 import { config } from "@core/config";
-import { OraProgressReporter } from "@progress/ora-progress-reporter";
+import { MultilineProgressReporter } from "@progress/multiline-progress-reporter";
 import { runPipeline } from "@pipeline/run";
 import { loadNotionSyncEnv } from "@core/env";
 import { NotionDatabaseClient } from "@notion/client";
-import { OraNotionSyncProgressReporter } from "@notion/ora-progress-reporter";
+import { NotionSyncProgressReporter } from "@notion/progress-reporter";
 import { syncJobsToNotion } from "@notion/sync";
 import { importJobsFromNotion } from "@notion/import";
 import { PostgresJobRepository } from "@storage/postgres-job-repository";
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   const scrapeArgs = isOptionFlag ? args : args.slice(1);
 
   if (command === "scrape") {
-    const progress = new OraProgressReporter();
+    const progress = new MultilineProgressReporter();
     try {
       const options = parseCliOptions(scrapeArgs);
       const summary = await runPipeline(config, progress, undefined, options);
@@ -30,7 +30,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     }
   } else if (command === "sync-notion") {
-    const progress = new OraNotionSyncProgressReporter();
+    const progress = new NotionSyncProgressReporter();
     let repository: PostgresJobRepository | undefined;
     try {
       repository = new PostgresJobRepository(config.databaseUrl);
