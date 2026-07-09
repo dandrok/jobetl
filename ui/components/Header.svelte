@@ -6,7 +6,10 @@
     searchQuery,
     onSearchChange,
     onToggleSidebar,
-    isSidebarCollapsed
+    isSidebarCollapsed,
+    minScore = 0,
+    maxScore = 100,
+    onResetScoreRange
   } = $props<{
     currentFilter: "matched" | "all" | "rejected" | "applied" | "not-interested";
     currentSort: "score" | "date";
@@ -15,6 +18,9 @@
     onSearchChange: (q: string) => void;
     onToggleSidebar: () => void;
     isSidebarCollapsed: boolean;
+    minScore?: number;
+    maxScore?: number;
+    onResetScoreRange: () => void;
   }>();
 
   function getTitle(f: "matched" | "all" | "rejected" | "applied" | "not-interested") {
@@ -51,11 +57,38 @@
           ></line></svg
         >
       </button>
-      <h1
-        class="font-serif text-2xl lg:text-4xl text-(--text-primary) tracking-tight whitespace-nowrap"
-      >
-        {getTitle(currentFilter)}
-      </h1>
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <h1
+          class="font-serif text-2xl lg:text-4xl text-(--text-primary) tracking-tight whitespace-nowrap"
+        >
+          {getTitle(currentFilter)}
+        </h1>
+        {#if minScore > 0 || maxScore < 100}
+          <span
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.7rem] font-medium font-mono bg-(--bg-hover) text-(--text-secondary) border border-(--border-subtle) self-center"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-(--accent)"></span>
+            Score: {minScore}% - {maxScore}%
+            <button
+              onclick={onResetScoreRange}
+              class="hover:text-(--text-primary) cursor-pointer focus:outline-none ml-0.5 rounded-full p-0.5 hover:bg-(--bg-active) transition-colors flex items-center justify-center"
+              aria-label="Reset score filter"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </span>
+        {/if}
+      </div>
     </div>
   </div>
 

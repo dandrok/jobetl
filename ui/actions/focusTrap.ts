@@ -1,4 +1,4 @@
-export function focusTrap(node: HTMLElement) {
+export function focusTrap(node: HTMLElement, active: boolean = true) {
   const focusableSelectors = [
     "a[href]",
     "area[href]",
@@ -16,6 +16,7 @@ export function focusTrap(node: HTMLElement) {
   let focusableElements: HTMLElement[] = [];
   let firstFocusable: HTMLElement | null = null;
   let lastFocusable: HTMLElement | null = null;
+  let isEnabled = active;
 
   function updateFocusableElements() {
     focusableElements = Array.from(node.querySelectorAll<HTMLElement>(focusableSelectors));
@@ -29,7 +30,7 @@ export function focusTrap(node: HTMLElement) {
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key !== "Tab") return;
+    if (!isEnabled || e.key !== "Tab") return;
 
     updateFocusableElements();
 
@@ -54,15 +55,31 @@ export function focusTrap(node: HTMLElement) {
   node.addEventListener("keydown", handleKeydown);
 
   // Auto-focus first element slightly after mount to ensure rendering is complete
-  const timeoutId = setTimeout(() => {
-    updateFocusableElements();
-    if (firstFocusable) firstFocusable.focus();
-    else node.focus();
-  }, 10);
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  if (isEnabled) {
+    timeoutId = setTimeout(() => {
+      if (!isEnabled) return;
+      updateFocusableElements();
+      if (firstFocusable) firstFocusable.focus();
+      else node.focus();
+    }, 10);
+  }
 
   return {
+    update(newActive: boolean) {
+      isEnabled = newActive;
+      if (isEnabled) {
+        updateFocusableElements();
+        if (firstFocusable) firstFocusable.focus();
+      } else {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      }
+    },
     destroy() {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       node.removeEventListener("keydown", handleKeydown);
     }
   };

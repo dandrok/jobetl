@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
+  import { flip } from "svelte/animate";
   import type { StoredJob } from "./types";
   import JobCard from "./components/JobCard.svelte";
   import Drawer from "./components/Drawer.svelte";
@@ -14,9 +15,34 @@
   let searchQuery = $state("");
   let appliedFilter = $state<"all" | "only" | "hide">("all");
   let notInterestedFilter = $state<"all" | "only" | "hide">("hide");
+  let minScore = $state(0);
+  let maxScore = $state(100);
 
   let selectedSources = $state<Set<string>>(new Set());
   let allSources = $derived([...new Set(allJobs.map((j) => j.source))].filter(Boolean));
+
+  let sourceCounts = $derived.by(() => {
+    const counts: Record<string, number> = {};
+    for (const job of allJobs) {
+      if (job.source) {
+        counts[job.source] = (counts[job.source] || 0) + 1;
+      }
+    }
+    return counts;
+  });
+
+  function resetScoreRange() {
+    minScore = 0;
+    maxScore = 100;
+  }
+
+  function resetAllFilters() {
+    searchQuery = "";
+    resetScoreRange();
+    appliedFilter = "all";
+    notInterestedFilter = "hide";
+    selectedSources = new Set(allSources);
+  }
 
   let isLoading = $state(true);
   let error = $state<string | null>(null);
@@ -88,7 +114,15 @@
         if (notInterestedFilter === "hide" && job.isNotInterested) return false;
       }
 
-      // 3. Filter by selected sources
+      // 3. Filter by match score range
+      if (job.matchScore != null) {
+        const scorePct = Math.round(job.matchScore * 100);
+        if (scorePct < minScore || scorePct > maxScore) return false;
+      } else if (minScore > 0 || maxScore < 100) {
+        return false;
+      }
+
+      // 4. Filter by selected sources
       if (!selectedSources.has(job.source)) return false;
 
       // 4. Search query
@@ -248,9 +282,16 @@
     onAppliedFilterChange={handleAppliedFilterChange}
     {notInterestedFilter}
     onNotInterestedFilterChange={handleNotInterestedFilterChange}
+    bind:minScore
+    bind:maxScore
+    {sourceCounts}
   />
 
-  <main class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full">
+  <main
+    class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full transition-panel {!isSidebarCollapsed
+      ? 'lg:ml-[280px]'
+      : ''}"
+  >
     <Header
       {currentFilter}
       {currentSort}
@@ -259,6 +300,9 @@
       onSearchChange={(q) => (searchQuery = q)}
       onToggleSidebar={toggleSidebar}
       {isSidebarCollapsed}
+      {minScore}
+      {maxScore}
+      onResetScoreRange={resetScoreRange}
     />
 
     <div class="p-4 md:p-8 xl:px-12 flex flex-col gap-6 md:gap-10 w-full">
@@ -301,14 +345,49 @@
               {error}
             </div>
           {:else if filteredJobs.length === 0}
-            <div class="py-20 px-4 text-center text-(--text-tertiary) font-serif italic text-xl">
-              No jobs match your criteria.
+            <div
+              class="py-16 px-6 text-center flex flex-col items-center justify-center gap-4 max-w-md mx-auto w-full"
+            >
+              <div
+                class="w-12 h-12 rounded-full bg-(--accent-light) text-(--accent) flex items-center justify-center border border-(--accent)/10"
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <h3 class="text-lg font-semibold text-(--text-primary)">No Matching Jobs</h3>
+                <p class="text-sm text-(--text-secondary) leading-relaxed">
+                  Try adjusting your filters, score range, or search query to find matching job
+                  opportunities.
+                </p>
+              </div>
+              <button
+                onclick={resetAllFilters}
+                class="mt-2 px-5 py-2.5 bg-(--accent) hover:opacity-90 text-(--bg-base) font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm cursor-pointer outline-none"
+              >
+                Reset Filters
+              </button>
             </div>
           {:else}
             {#key currentFilter}
               <div in:fade={{ duration: 150 }} class="flex flex-col w-full">
                 {#each filteredJobs as job (job.externalId)}
-                  <JobCard {job} onToggleApply={toggleApply} onClick={(j) => (selectedJob = j)} />
+                  <div
+                    animate:flip={{ duration: 300 }}
+                    transition:fade={{ duration: 150 }}
+                    class="w-full"
+                  >
+                    <JobCard {job} onToggleApply={toggleApply} onClick={(j) => (selectedJob = j)} />
+                  </div>
                 {/each}
               </div>
             {/key}
