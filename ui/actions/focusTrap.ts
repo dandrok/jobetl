@@ -58,6 +58,7 @@ export function focusTrap(node: HTMLElement, active: boolean = true) {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   if (isEnabled) {
     timeoutId = setTimeout(() => {
+      if (!isEnabled) return;
       updateFocusableElements();
       if (firstFocusable) firstFocusable.focus();
       else node.focus();
@@ -70,6 +71,11 @@ export function focusTrap(node: HTMLElement, active: boolean = true) {
       if (isEnabled) {
         updateFocusableElements();
         if (firstFocusable) firstFocusable.focus();
+      } else {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
       }
     },
     destroy() {

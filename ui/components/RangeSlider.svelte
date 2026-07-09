@@ -33,7 +33,11 @@
     const rect = container.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, clickX / rect.width));
-    const value = Math.round(rangeMin + percentage * (rangeMax - rangeMin));
+    const rawValue = rangeMin + percentage * (rangeMax - rangeMin);
+    const value = Math.max(
+      rangeMin,
+      Math.min(rangeMax, Math.round((rawValue - rangeMin) / step) * step + rangeMin)
+    );
 
     const distMin = Math.abs(value - min);
     const distMax = Math.abs(value - max);
@@ -54,12 +58,8 @@
   <div
     bind:this={container}
     onclick={handleTrackClick}
-    role="slider"
-    aria-valuemin={rangeMin}
-    aria-valuemax={rangeMax}
-    aria-valuenow={min}
+    role="group"
     aria-label="Score range slider"
-    tabindex="-1"
     class="relative w-full h-6 flex items-center cursor-pointer select-none"
   >
     <!-- Background Track -->
