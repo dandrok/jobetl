@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const JOB_SOURCES = ["justjoinit", "nofluffjobs", "bulldogjob", "pracujpl"] as const;
+export const JOB_SOURCES = [
+  "justjoinit",
+  "nofluffjobs",
+  "bulldogjob",
+  "pracujpl",
+  "thesmartjobs"
+] as const;
 
 export const JobSourceSchema = z.enum(JOB_SOURCES);
 export type JobSource = z.infer<typeof JobSourceSchema>;
@@ -107,6 +113,11 @@ export interface PracujPlSearchFilters {
   location?: string;
 }
 
+export interface TheSmartJobsSearchFilters {
+  category?: string;
+  sort?: string;
+}
+
 export type SearchFilters = JustJoinItSearchFilters;
 
 export interface SourceConfig<TFilters = SearchFilters> {
@@ -121,6 +132,7 @@ export interface SourceConfigMap {
   nofluffjobs: SourceConfig<NoFluffJobsSearchFilters>;
   bulldogjob: SourceConfig<BulldogjobSearchFilters>;
   pracujpl: SourceConfig<PracujPlSearchFilters>;
+  thesmartjobs: SourceConfig<TheSmartJobsSearchFilters>;
 }
 
 export type SourceConfigFor<T extends JobSource> = SourceConfigMap[T];

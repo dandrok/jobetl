@@ -46,6 +46,15 @@ function createConfig(): RunConfig {
         filters: {
           keyword: "javascript"
         }
+      },
+      thesmartjobs: {
+        enabled: true,
+        baseUrl: "https://thesmartjobs.com",
+        maxListings: 10,
+        filters: {
+          category: "it-03989325",
+          sort: "freshness"
+        }
       }
     }
   };
@@ -68,6 +77,10 @@ function createAdapters(): SourceAdapterMap {
     pracujpl: {
       source: "pracujpl",
       discoverListings: async () => []
+    },
+    thesmartjobs: {
+      source: "thesmartjobs",
+      discoverListings: async () => []
     }
   };
 }
@@ -80,7 +93,8 @@ describe("selectSources", () => {
       "justjoinit",
       "nofluffjobs",
       "bulldogjob",
-      "pracujpl"
+      "pracujpl",
+      "thesmartjobs"
     ]);
   });
 

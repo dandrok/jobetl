@@ -16,7 +16,7 @@ Simple use case: you want a daily list of jobs worth reviewing instead of openin
 ## Stack
 
 - Runtime: Node.js + TypeScript
-- Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`
+- Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`, `thesmartjobs.com`
 - Full-offer extraction: Jina Reader (with local Cheerio HTML-to-text fallback)
 - AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
 - Storage: local PostgreSQL database managed via **Drizzle ORM**
@@ -146,6 +146,7 @@ npm run dev -- --source justjoinit
 npm run dev -- --source nofluffjobs
 npm run dev -- --source bulldogjob
 npm run dev -- --source pracujpl
+npm run dev -- --source thesmartjobs
 ```
 
 Review the best saved matches in the terminal:
