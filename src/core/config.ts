@@ -44,6 +44,15 @@ export const config: RunConfig = {
       filters: {
         keyword: "javascript"
       }
+    },
+    thesmartjobs: {
+      enabled: true,
+      baseUrl: "https://thesmartjobs.com",
+      maxListings: 200,
+      filters: {
+        category: "it-03989325",
+        sort: "freshness"
+      }
     }
   }
 };

@@ -81,6 +81,15 @@ function createConfig(): RunConfig {
           keyword: "node"
         },
         maxListings: 10
+      },
+      thesmartjobs: {
+        enabled: true,
+        baseUrl: "https://thesmartjobs.com",
+        filters: {
+          category: "it-03989325",
+          sort: "freshness"
+        },
+        maxListings: 10
       }
     }
   };
@@ -247,6 +256,10 @@ function createAdapters(
     pracujpl: {
       source: "pracujpl",
       discoverListings: vi.fn(async () => listingsBySource.pracujpl ?? [])
+    },
+    thesmartjobs: {
+      source: "thesmartjobs",
+      discoverListings: vi.fn(async () => listingsBySource.thesmartjobs ?? [])
     }
   };
 }

@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { BulldogjobAdapter } from "@scrapers/bulldogjob";
 import { JustJoinItAdapter } from "@scrapers/justjoinit";
 import { NoFluffJobsAdapter } from "@scrapers/nofluffjobs";
+import { TheSmartJobsAdapter } from "@scrapers/thesmartjobs";
 
 describe("JustJoinItAdapter", () => {
   test("limits discovery to the configured maxListings", async () => {
@@ -218,6 +219,130 @@ describe("BulldogjobAdapter", () => {
       externalId: "bulldogjob:/companies/jobs/236466-senior-frontend-engineer-madrid-aircall",
       company: "Aircall",
       location: "Madrid"
+    });
+  });
+});
+
+describe("TheSmartJobsAdapter", () => {
+  test("discovers listings across paginated JSON API pages", async () => {
+    const page1Data = {
+      data: [
+        {
+          id: "job-1",
+          title: "Senior Node Developer",
+          slug: "senior-node-developer-1234",
+          slugUrl: "jobs/senior-node-developer-1234",
+          company: { name: "Acme Corp" },
+          salaries: [
+            { min: 15000, max: 20000, currency: "PLN", period: "monthly", contractType: "b2b" }
+          ],
+          locations: [{ city: "Warszawa" }]
+        },
+        {
+          id: "job-2",
+          title: "QA Engineer",
+          slug: "qa-engineer-5678",
+          slugUrl: "praca/qa-engineer-5678",
+          company: { name: "TestCo" },
+          salaries: [],
+          locations: []
+        }
+      ],
+      meta: {
+        total: 3,
+        page: 1,
+        limit: 2,
+        totalPages: 2
+      }
+    };
+
+    const page2Data = {
+      data: [
+        {
+          id: "job-3",
+          title: "Frontend Developer",
+          slug: "frontend-developer-9012",
+          slugUrl: "jobs/frontend-developer-9012",
+          company: { name: "WebCorp" },
+          salaries: [
+            {
+              min: 10000,
+              max: 15000,
+              currency: "PLN",
+              period: "monthly",
+              contractType: "employmentContract"
+            }
+          ],
+          locations: [{ city: "Kraków" }]
+        }
+      ],
+      meta: {
+        total: 3,
+        page: 2,
+        limit: 2,
+        totalPages: 2
+      }
+    };
+
+    const adapter = new TheSmartJobsAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url.includes("page=1")) {
+        return JSON.stringify(page1Data);
+      }
+      if (url.includes("page=2")) {
+        return JSON.stringify(page2Data);
+      }
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://thesmartjobs.com",
+        maxListings: 3,
+        filters: {
+          category: "it-03989325",
+          sort: "freshness"
+        }
+      },
+      fetchHtml
+    );
+
+    expect(fetchHtml.mock.calls.map(([url]) => url)).toEqual([
+      "https://thesmartjobs.com/api/jobs/search?categories=it-03989325&sort=freshness&locale=pl&page=1",
+      "https://thesmartjobs.com/api/jobs/search?categories=it-03989325&sort=freshness&locale=pl&page=2"
+    ]);
+
+    expect(offers).toHaveLength(3);
+
+    expect(offers[0]).toMatchObject({
+      externalId: "thesmartjobs:job-1",
+      source: "thesmartjobs",
+      url: "https://thesmartjobs.com/pl/jobs/senior-node-developer-1234",
+      title: "Senior Node Developer",
+      company: "Acme Corp",
+      salaryText: "15000 - 20000 PLN / monthly (b2b)",
+      location: "Warszawa"
+    });
+
+    expect(offers[1]).toMatchObject({
+      externalId: "thesmartjobs:job-2",
+      source: "thesmartjobs",
+      url: "https://thesmartjobs.com/pl/praca/qa-engineer-5678",
+      title: "QA Engineer",
+      company: "TestCo",
+      salaryText: undefined,
+      location: undefined
+    });
+
+    expect(offers[2]).toMatchObject({
+      externalId: "thesmartjobs:job-3",
+      source: "thesmartjobs",
+      url: "https://thesmartjobs.com/pl/jobs/frontend-developer-9012",
+      title: "Frontend Developer",
+      company: "WebCorp",
+      salaryText: "10000 - 15000 PLN / monthly (employmentContract)",
+      location: "Kraków"
     });
   });
 });
