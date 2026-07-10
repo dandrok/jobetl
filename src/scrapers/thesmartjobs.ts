@@ -19,12 +19,42 @@ export class TheSmartJobsAdapter implements SourceAdapter<"thesmartjobs"> {
     return url.toString();
   }
 
-  parseListings(jsonText: string, baseUrl: string): { listings: JobListing[]; totalPages: number } {
+  parseListings(
+    jsonText: string,
+    baseUrl: string
+  ): { listings: JobListing[]; totalPages: number; pageSize: number } {
     try {
       const payload = JSON.parse(jsonText);
-      const jobs = payload.data || [];
+
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        !Array.isArray(payload.data) ||
+        (payload.meta !== undefined && (payload.meta === null || typeof payload.meta !== "object"))
+      ) {
+        Telemetry.recordScrapeValidationFailure(
+          this.source,
+          baseUrl,
+          new Error("Invalid response envelope structure from thesmartjobs API")
+        );
+        return { listings: [], totalPages: 0, pageSize: 20 };
+      }
+
+      const jobs = payload.data;
       const meta = payload.meta || {};
-      const totalPages = typeof meta.totalPages === "number" ? meta.totalPages : 1;
+
+      const rawTotalPages = meta.totalPages;
+      if (rawTotalPages !== undefined && (!Number.isInteger(rawTotalPages) || rawTotalPages < 0)) {
+        Telemetry.recordScrapeValidationFailure(
+          this.source,
+          baseUrl,
+          new Error("Invalid totalPages count in thesmartjobs API response")
+        );
+        return { listings: [], totalPages: 0, pageSize: 20 };
+      }
+
+      const totalPages = typeof rawTotalPages === "number" ? rawTotalPages : 1;
+      const pageSize = typeof meta.limit === "number" ? meta.limit : 20;
 
       const listings: JobListing[] = [];
 
@@ -100,11 +130,11 @@ export class TheSmartJobsAdapter implements SourceAdapter<"thesmartjobs"> {
         }
       }
 
-      return { listings, totalPages };
+      return { listings, totalPages, pageSize };
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
       Telemetry.recordScrapeValidationFailure(this.source, baseUrl, err);
-      return { listings: [], totalPages: 0 };
+      return { listings: [], totalPages: 0, pageSize: 20 };
     }
   }
 
@@ -117,6 +147,7 @@ export class TheSmartJobsAdapter implements SourceAdapter<"thesmartjobs"> {
     // Phase 1: Fetch page 1 to get baseline listings and the total page count
     const firstPageUrl = this.buildSearchUrl(config.filters, config.baseUrl, 1);
     let totalPages: number;
+    let pageSize: number;
     try {
       const jsonText = await fetchHtml(firstPageUrl, {
         headers: { Accept: "application/json" }
@@ -124,6 +155,7 @@ export class TheSmartJobsAdapter implements SourceAdapter<"thesmartjobs"> {
       const result = this.parseListings(jsonText, config.baseUrl);
       offers.push(...result.listings);
       totalPages = result.totalPages;
+      pageSize = result.pageSize;
     } catch (e) {
       Telemetry.recordScrapeValidationFailure(
         this.source,
@@ -135,7 +167,6 @@ export class TheSmartJobsAdapter implements SourceAdapter<"thesmartjobs"> {
     }
 
     // Phase 2: Fetch remaining pages up to maxListings in parallel
-    const pageSize = 20; // Default page limit from thesmartjobs API response
     const neededListings = config.maxListings - offers.length;
     if (neededListings > 0 && totalPages > 1) {
       const additionalPagesNeeded = Math.min(Math.ceil(neededListings / pageSize), totalPages - 1);

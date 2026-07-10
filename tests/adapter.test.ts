@@ -345,4 +345,140 @@ describe("TheSmartJobsAdapter", () => {
       location: "Kraków"
     });
   });
+
+  test("isolates errors per-record and per-page, and handles slug fallback", async () => {
+    const page1Data = {
+      data: [
+        {
+          id: "job-valid-1",
+          title: "Valid Senior Node Developer",
+          slugUrl: "jobs/valid-1",
+          company: { name: "Acme Corp" }
+        },
+        {
+          title: "Missing ID Job",
+          slugUrl: "jobs/missing-id",
+          company: { name: "Acme Corp" }
+        },
+        {
+          id: "job-missing-title",
+          slugUrl: "jobs/missing-title",
+          company: { name: "Acme Corp" }
+        },
+        {
+          id: "job-fallback-slug",
+          title: "Fallback Slug Job",
+          slug: "fallback-slug-path",
+          company: { name: "Acme Corp" }
+        },
+        {
+          id: "job-zod-fail",
+          title: "A",
+          slugUrl: "jobs/zod-fail",
+          company: { name: "Acme Corp" }
+        }
+      ],
+      meta: {
+        total: 5,
+        page: 1,
+        limit: 2,
+        totalPages: 3
+      }
+    };
+
+    const page3Data = {
+      data: [
+        {
+          id: "job-valid-3",
+          title: "Valid Frontend Developer",
+          slugUrl: "jobs/valid-3",
+          company: { name: "WebCorp" }
+        }
+      ],
+      meta: {
+        total: 5,
+        page: 3,
+        limit: 2,
+        totalPages: 3
+      }
+    };
+
+    const adapter = new TheSmartJobsAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url.includes("page=1")) {
+        return JSON.stringify(page1Data);
+      }
+      if (url.includes("page=2")) {
+        throw new Error("Simulated page 2 fetch failure");
+      }
+      if (url.includes("page=3")) {
+        return JSON.stringify(page3Data);
+      }
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://thesmartjobs.com",
+        maxListings: 10,
+        filters: {
+          category: "it-03989325"
+        }
+      },
+      fetchHtml
+    );
+
+    const requestedUrls = fetchHtml.mock.calls.map(([url]) => url);
+    expect(requestedUrls).toEqual([
+      "https://thesmartjobs.com/api/jobs/search?categories=it-03989325&locale=pl&page=1",
+      "https://thesmartjobs.com/api/jobs/search?categories=it-03989325&locale=pl&page=2",
+      "https://thesmartjobs.com/api/jobs/search?categories=it-03989325&locale=pl&page=3"
+    ]);
+
+    expect(offers).toHaveLength(3);
+
+    expect(offers[0]).toMatchObject({
+      externalId: "thesmartjobs:job-valid-1",
+      url: "https://thesmartjobs.com/pl/jobs/valid-1",
+      title: "Valid Senior Node Developer"
+    });
+
+    expect(offers[1]).toMatchObject({
+      externalId: "thesmartjobs:job-fallback-slug",
+      url: "https://thesmartjobs.com/pl/jobs/fallback-slug-path",
+      title: "Fallback Slug Job"
+    });
+
+    expect(offers[2]).toMatchObject({
+      externalId: "thesmartjobs:job-valid-3",
+      url: "https://thesmartjobs.com/pl/jobs/valid-3",
+      title: "Valid Frontend Developer"
+    });
+  });
+
+  test("returns safe fallback when JSON response envelope is malformed", () => {
+    const adapter = new TheSmartJobsAdapter();
+
+    // 1. payload is null
+    let result = adapter.parseListings("null", "https://thesmartjobs.com");
+    expect(result).toEqual({ listings: [], totalPages: 0, pageSize: 20 });
+
+    // 2. payload.data is not an array
+    result = adapter.parseListings(JSON.stringify({ data: {} }), "https://thesmartjobs.com");
+    expect(result).toEqual({ listings: [], totalPages: 0, pageSize: 20 });
+
+    // 3. meta.totalPages is not a non-negative integer
+    result = adapter.parseListings(
+      JSON.stringify({ data: [], meta: { totalPages: -1 } }),
+      "https://thesmartjobs.com"
+    );
+    expect(result).toEqual({ listings: [], totalPages: 0, pageSize: 20 });
+
+    result = adapter.parseListings(
+      JSON.stringify({ data: [], meta: { totalPages: 1.5 } }),
+      "https://thesmartjobs.com"
+    );
+    expect(result).toEqual({ listings: [], totalPages: 0, pageSize: 20 });
+  });
 });
