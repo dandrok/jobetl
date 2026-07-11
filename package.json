@@ -18,6 +18,8 @@
     "test:watch": "vitest",
     "db:start": "docker compose up -d",
     "db:stop": "docker compose down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "api": "tsx src/cli.ts serve",
     "dashboard": "concurrently \"npm run api\" \"npm run dev:ui\"",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts' 'ui/**/*.{ts,svelte}'",
