@@ -5,7 +5,9 @@ dist/
 .env.*
 !.env.example
 coverage/
-data/
+data/*
+!data/migrations/
+!data/init-db.sql
 *.db
 cv.md
 docs/

@@ -23,10 +23,10 @@ function mapRow(row: typeof jobsTable.$inferSelect): StoredJob {
     status: row.status as StoredJob["status"],
     isApplied: row.isApplied,
     isNotInterested: row.isNotInterested,
-    postedAt: row.postedAt ?? undefined,
-    appliedAt: row.appliedAt ?? undefined,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    postedAt: row.postedAt ? new Date(row.postedAt).toISOString() : undefined,
+    appliedAt: row.appliedAt ? new Date(row.appliedAt).toISOString() : undefined,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString()
   };
 }
 
