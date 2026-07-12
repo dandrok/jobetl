@@ -1,10 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  buildNotionJobProperties,
-  mapNotionPageToStoredJob,
-  normalizeDate
-} from "@notion/mapper";
+import { buildNotionJobProperties, mapNotionPageToStoredJob, normalizeDate } from "@notion/mapper";
 import type { StoredJob } from "@core/types";
 
 const job: StoredJob = {
@@ -168,21 +164,19 @@ describe("buildNotionJobProperties", () => {
 
 describe("normalizeDate", () => {
   test("returns normalized ISO string for valid primary date", () => {
-    expect(normalizeDate("2024-01-01T12:00:00.000Z", undefined)).toBe(
-      "2024-01-01T12:00:00.000Z"
-    );
+    expect(normalizeDate("2024-01-01T12:00:00.000Z", undefined)).toBe("2024-01-01T12:00:00.000Z");
   });
 
   test("falls back to page time when primary is invalid", () => {
-    expect(
-      normalizeDate("not-a-date", "2024-01-02T00:00:00.000Z")
-    ).toBe("2024-01-02T00:00:00.000Z");
+    expect(normalizeDate("not-a-date", "2024-01-02T00:00:00.000Z")).toBe(
+      "2024-01-02T00:00:00.000Z"
+    );
   });
 
   test("prefers primary when both are valid", () => {
-    expect(
-      normalizeDate("2024-05-01T00:00:00.000Z", "2024-01-01T00:00:00.000Z")
-    ).toBe("2024-05-01T00:00:00.000Z");
+    expect(normalizeDate("2024-05-01T00:00:00.000Z", "2024-01-01T00:00:00.000Z")).toBe(
+      "2024-05-01T00:00:00.000Z"
+    );
   });
 
   test("normalizes date-only strings via fallback", () => {
@@ -191,17 +185,11 @@ describe("normalizeDate", () => {
   });
 
   test("throws when both primary and fallback are invalid or missing", () => {
-    expect(() => normalizeDate("bad", "also-bad")).toThrow(
-      "Invalid date value for job"
-    );
-    expect(() => normalizeDate(undefined, undefined)).toThrow(
-      "Invalid date value for job"
-    );
+    expect(() => normalizeDate("bad", "also-bad")).toThrow("Invalid date value for job");
+    expect(() => normalizeDate(undefined, undefined)).toThrow("Invalid date value for job");
   });
 
   test("handles ISO strings with offset", () => {
-    expect(normalizeDate("2024-01-01T12:00:00+02:00", undefined)).toBe(
-      "2024-01-01T10:00:00.000Z"
-    );
+    expect(normalizeDate("2024-01-01T12:00:00+02:00", undefined)).toBe("2024-01-01T10:00:00.000Z");
   });
 });

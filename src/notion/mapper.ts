@@ -302,17 +302,18 @@ export function mapNotionPageToStoredJob(
   };
 }
 
-export function normalizeDate(
-  primary: string | undefined,
-  fallback: string | undefined
-): string {
+export function normalizeDate(primary: string | undefined, fallback: string | undefined): string {
   const tryParse = (v: string | undefined): string | null => {
     if (!v) return null;
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d.toISOString();
   };
 
-  return tryParse(primary) ?? tryParse(fallback) ?? (() => {
-    throw new Error("Invalid date value for job");
-  })();
+  return (
+    tryParse(primary) ??
+    tryParse(fallback) ??
+    (() => {
+      throw new Error("Invalid date value for job");
+    })()
+  );
 }
