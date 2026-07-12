@@ -56,16 +56,6 @@ export async function importJobsFromNotion(
         summary.failed += 1;
         const message = error instanceof Error ? error.message : String(error);
         summary.errors.push(`${page.id}: ${message}`);
-        // Temporary debug - remove after fixing
-        if (error instanceof Error) {
-          console.error(`Full Postgres error for ${page.id}:`, {
-            message: error.message,
-            code: (error as any).code,
-            detail: (error as any).detail,
-            hint: (error as any).hint,
-            query: (error as any).query
-          });
-        }
       }
     }
 
