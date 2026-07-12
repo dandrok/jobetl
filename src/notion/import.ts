@@ -63,7 +63,7 @@ export async function importJobsFromNotion(
             code: (error as any).code,
             detail: (error as any).detail,
             hint: (error as any).hint,
-            query: (error as any).query,
+            query: (error as any).query
           });
         }
       }
