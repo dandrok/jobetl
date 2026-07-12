@@ -289,13 +289,31 @@ export function mapNotionPageToStoredJob(
         readRichTextPlainText(page.properties["Applied At"]) ??
         undefined)
       : undefined,
-    createdAt:
+    createdAt: normalizeDate(
       readDateStart(page.properties["Created At"]) ??
-      readRichTextPlainText(page.properties["Created At"]) ??
-      page.createdTime,
-    updatedAt:
+        readRichTextPlainText(page.properties["Created At"]),
+      page.createdTime
+    ),
+    updatedAt: normalizeDate(
       readDateStart(page.properties["Updated At"]) ??
-      readRichTextPlainText(page.properties["Updated At"]) ??
+        readRichTextPlainText(page.properties["Updated At"]),
       page.lastEditedTime
+    )
   };
+}
+
+export function normalizeDate(primary: string | undefined, fallback: string | undefined): string {
+  const tryParse = (v: string | undefined): string | null => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+
+  return (
+    tryParse(primary) ??
+    tryParse(fallback) ??
+    (() => {
+      throw new Error("Invalid date value for job");
+    })()
+  );
 }
