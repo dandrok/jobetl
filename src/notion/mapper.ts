@@ -289,13 +289,24 @@ export function mapNotionPageToStoredJob(
         readRichTextPlainText(page.properties["Applied At"]) ??
         undefined)
       : undefined,
-    createdAt:
+    createdAt: normalizeDate(
       readDateStart(page.properties["Created At"]) ??
       readRichTextPlainText(page.properties["Created At"]) ??
-      page.createdTime,
-    updatedAt:
+      page.createdTime
+    ),
+    updatedAt: normalizeDate(
       readDateStart(page.properties["Updated At"]) ??
       readRichTextPlainText(page.properties["Updated At"]) ??
       page.lastEditedTime
+    )
   };
+}
+
+function normalizeDate(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return new Date(value).toISOString();
+  } catch {
+    return value;
+  }
 }
