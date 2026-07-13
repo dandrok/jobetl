@@ -56,6 +56,18 @@ export async function importJobsFromNotion(
         summary.failed += 1;
         const message = error instanceof Error ? error.message : String(error);
         summary.errors.push(`${page.id}: ${message}`);
+
+        // Gated debug logging (set DEBUG_DB=1 to enable)
+        if (process.env.DEBUG_DB && error instanceof Error) {
+          const err = error as Error & { code?: string; detail?: string; hint?: string };
+          console.error(`DB error for ${page.id}:`, {
+            message: err.message,
+            code: err.code,
+            detail: err.detail ? String(err.detail).slice(0, 300) : undefined,
+            hint: err.hint ? String(err.hint).slice(0, 200) : undefined
+            // query not logged (security)
+          });
+        }
       }
     }
 
