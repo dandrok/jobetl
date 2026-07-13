@@ -1,0 +1,33 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: cd-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@029f5b4b1a4bbd89d4444c9b83b3e21820cb05c1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd ~/jobetl
+            git fetch origin
+            git reset --hard origin/master
+            npm ci
+            npm run db:migrate
+            npm run build
+            # Reload PM2 application to apply code updates
+            npx pm2 reload ecosystem.config.cjs --env production || npx pm2 start ecosystem.config.cjs --env production

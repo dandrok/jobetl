@@ -285,9 +285,10 @@ export function mapNotionPageToStoredJob(
       : false,
     status,
     appliedAt: schema.appliedAtKind
-      ? (readDateStart(page.properties["Applied At"]) ??
-        readRichTextPlainText(page.properties["Applied At"]) ??
-        undefined)
+      ? normalizeOptionalDate(
+          readDateStart(page.properties["Applied At"]) ??
+            readRichTextPlainText(page.properties["Applied At"])
+        )
       : undefined,
     createdAt: normalizeDate(
       readDateStart(page.properties["Created At"]) ??
@@ -300,6 +301,12 @@ export function mapNotionPageToStoredJob(
       page.lastEditedTime
     )
   };
+}
+
+export function normalizeOptionalDate(value: string | undefined): string | undefined {
+  if (!value || value.trim() === "") return undefined;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
 export function normalizeDate(primary: string | undefined, fallback: string | undefined): string {

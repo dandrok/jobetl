@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import { buildNotionJobProperties, mapNotionPageToStoredJob, normalizeDate } from "@notion/mapper";
+import {
+  buildNotionJobProperties,
+  mapNotionPageToStoredJob,
+  normalizeDate,
+  normalizeOptionalDate
+} from "@notion/mapper";
 import type { StoredJob } from "@core/types";
 
 const job: StoredJob = {
@@ -191,5 +196,25 @@ describe("normalizeDate", () => {
 
   test("handles ISO strings with offset", () => {
     expect(normalizeDate("2024-01-01T12:00:00+02:00", undefined)).toBe("2024-01-01T10:00:00.000Z");
+  });
+});
+
+describe("normalizeOptionalDate", () => {
+  test("returns normalized ISO string for valid date", () => {
+    expect(normalizeOptionalDate("2024-01-01T12:00:00.000Z")).toBe("2024-01-01T12:00:00.000Z");
+  });
+
+  test("returns undefined for empty or whitespace values", () => {
+    expect(normalizeOptionalDate(undefined)).toBeUndefined();
+    expect(normalizeOptionalDate("")).toBeUndefined();
+    expect(normalizeOptionalDate("   ")).toBeUndefined();
+  });
+
+  test("returns undefined for invalid date formats", () => {
+    expect(normalizeOptionalDate("not-a-date")).toBeUndefined();
+  });
+
+  test("handles date-only formats by returning ISO representation", () => {
+    expect(normalizeOptionalDate("2024-12-31")).toMatch(/2024-12-31T00:00:00\.000Z/);
   });
 });
