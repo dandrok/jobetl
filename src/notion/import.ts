@@ -58,7 +58,7 @@ export async function importJobsFromNotion(
         summary.errors.push(`${page.id}: ${message}`);
 
         // Gated debug logging (set DEBUG_DB=1 to enable)
-        if (process.env.DEBUG_DB && error instanceof Error) {
+        if (process.env.DEBUG_DB === "1" && error instanceof Error) {
           const err = error as Error & { code?: string; detail?: string; hint?: string };
           console.error(`DB error for ${page.id}:`, {
             message: err.message,
