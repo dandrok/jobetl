@@ -182,13 +182,12 @@ npm run sync:notion
 
 The repo includes two core workflows:
 
-1. [`daily-crawl.yml`](.github/workflows/daily-crawl.yml): Production ETL cron job.
-   - Trigger: daily schedule plus manual `workflow_dispatch`
-   - Secrets: `JINA_API_KEY`, `DEEPSEEK_API_KEY`, `NOTION_TOKEN`, `NOTION_DATABASE_ID`
-   - Expectations: Expects Notion to be configured since it rebuilds local PostgreSQL state from Notion before crawling.
-2. [`ci.yml`](.github/workflows/ci.yml): Continuous Integration.
+1. [`ci.yml`](.github/workflows/ci.yml): Continuous Integration.
    - Trigger: `push` and `pull_request` to `master`.
    - Pipeline: Enforces Prettier formatting, ESLint rules, TypeScript compilation, and Vitest suite execution.
+2. [`deploy.yml`](.github/workflows/deploy.yml): Continuous Deployment.
+   - Trigger: `push` to `master`.
+   - Pipeline: Connects to the AWS EC2 instance via SSH, pulls code changes, runs database migrations, compiles the build, and reloads PM2.
 
 ## Deployment & Production Setup
 

@@ -1,10 +1,17 @@
+import "dotenv/config";
 import { sendNewsletter } from "@core/email";
-import { loadRuntimeEnv } from "@core/env";
 import type { MatchCandidate } from "@core/types";
 
 async function run() {
   try {
-    const env = loadRuntimeEnv();
+    const env = {
+      jinaApiKey: "",
+      deepseekApiKey: "",
+      resendApiKey: process.env.RESEND_API_KEY,
+      senderEmail: process.env.SENDER_EMAIL,
+      recipientEmail: process.env.RECIPIENT_EMAIL
+    };
+
     console.log("--- CONFIGURATION CHECK ---");
     console.log("Sender Email:   ", env.senderEmail);
     console.log("Recipient Email:", env.recipientEmail);
@@ -36,10 +43,16 @@ async function run() {
     ];
 
     console.log("Attempting to dispatch test email...");
-    await sendNewsletter(mockJobs, env);
-    console.log("Email script run complete.");
+    const success = await sendNewsletter(mockJobs, env);
+    if (success) {
+      console.log("Email script run complete.");
+    } else {
+      console.error("Email sending failed.");
+      process.exitCode = 1;
+    }
   } catch (error) {
     console.error("Test script failed:", error);
+    process.exitCode = 1;
   }
 }
 

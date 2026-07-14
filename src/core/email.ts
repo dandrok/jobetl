@@ -139,9 +139,9 @@ function compileHtmlTemplate(jobs: MatchCandidate[]): string {
 /**
  * Sends a newsletter of matched jobs using Resend API.
  */
-export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): Promise<void> {
+export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): Promise<boolean> {
   if (jobs.length === 0) {
-    return;
+    return true;
   }
 
   const { resendApiKey, senderEmail, recipientEmail } = env;
@@ -150,7 +150,7 @@ export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): P
     console.warn(
       "Skipping email alert: RESEND_API_KEY, SENDER_EMAIL, or RECIPIENT_EMAIL environment variables are missing."
     );
-    return;
+    return false;
   }
 
   const subject = `🔥 JobETL: ${jobs.length} New Job Match${jobs.length > 1 ? "es" : ""} Found!`;
@@ -181,6 +181,7 @@ export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): P
     }
 
     console.log(`Successfully sent email alert with ${jobs.length} matches to ${recipientEmail}`);
+    return true;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       console.error("Failed to send email alert: Resend API request timed out (10s)");
@@ -190,6 +191,7 @@ export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): P
         error instanceof Error ? error.message : String(error)
       );
     }
+    return false;
   } finally {
     clearTimeout(timeoutId);
   }
