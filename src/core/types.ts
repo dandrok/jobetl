@@ -149,6 +149,9 @@ export interface RunConfig {
 export interface RuntimeEnv {
   jinaApiKey: string;
   deepseekApiKey: string;
+  resendApiKey?: string;
+  senderEmail?: string;
+  recipientEmail?: string;
 }
 
 export interface NotionSyncEnv {

@@ -80,9 +80,11 @@ flowchart TD
         K -->|Write Status| D
     end
 
-    subgraph Presentation [4. Presentation Layer]
+    subgraph Presentation [4. Presentation & Alert Layer]
         D -->|Bidirectional Sync| L[(Notion Database)]
         D -->|Local API Queries| M[Vite/Svelte Dashboard]
+        CLI[Scrape Runner] -->|If new matches found| R[Resend Email API]
+        R -->|HTML Newsletter| Inbox((Your Inbox))
     end
 ```
 
@@ -95,6 +97,7 @@ Required for the core pipeline:
 Optional:
 
 - `JINA_API_KEY`: If not configured, or if your key is out of credits/rate-limited, the pipeline automatically falls back to Jina's keyless free-tier and then to the built-in local Cheerio text parser.
+- `RESEND_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`: If configured, the pipeline will automatically compile a styled HTML newsletter and send it via Resend whenever new matched job offers are discovered during a run.
 
 Required only if you use Notion sync or the bundled GitHub Actions workflow:
 
@@ -179,13 +182,21 @@ npm run sync:notion
 
 The repo includes two core workflows:
 
-1. [`daily-crawl.yml`](/home/dandrok/git/jobetl/.github/workflows/daily-crawl.yml): Production ETL cron job.
-   - Trigger: daily schedule plus manual `workflow_dispatch`
-   - Secrets: `JINA_API_KEY`, `DEEPSEEK_API_KEY`, `NOTION_TOKEN`, `NOTION_DATABASE_ID`
-   - Expectations: Expects Notion to be configured since it rebuilds local PostgreSQL state from Notion before crawling.
-2. [`ci.yml`](/home/dandrok/git/jobetl/.github/workflows/ci.yml): Continuous Integration.
+1. [`ci.yml`](.github/workflows/ci.yml): Continuous Integration.
    - Trigger: `push` and `pull_request` to `master`.
    - Pipeline: Enforces Prettier formatting, ESLint rules, TypeScript compilation, and Vitest suite execution.
+2. [`deploy.yml`](.github/workflows/deploy.yml): Continuous Deployment.
+   - Trigger: `push` to `master`.
+   - Pipeline: Connects to the AWS EC2 instance via SSH, pulls code changes, runs database migrations, compiles the build, and reloads PM2.
+
+## Deployment & Production Setup
+
+In production, the application runs on a cloud instance with automated delivery:
+
+- **Hosting**: AWS EC2 instance running Ubuntu.
+- **Process Manager**: PM2 manages background tasks and supervises the API server using `ecosystem.config.cjs`.
+- **Database**: PostgreSQL runs in a containerized environment (via `docker-compose.yml`) with Docker persistent volumes preserving job records.
+- **Continuous Deployment**: Managed by GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)). Pushing to `master` initiates SSH connection to EC2, resets code, runs migrations, builds the bundle, and restarts the PM2 processes.
 
 ## Verify & Format
 
