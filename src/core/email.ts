@@ -95,7 +95,7 @@ function compileHtmlTemplate(jobs: MatchCandidate[]): string {
           ${reasonHtml}
 
           <div style="margin-top: 16px;">
-            <a href="${sanitizeUrl(job.url)}" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;">
+            <a href="${sanitizeUrl(job.url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;">
               View Offer &rarr;
             </a>
           </div>
@@ -180,7 +180,7 @@ export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): P
       throw new Error(`Resend API returned status ${response.status}: ${errText}`);
     }
 
-    console.log(`Successfully sent email alert with ${jobs.length} matches to ${recipientEmail}`);
+    console.log(`Successfully sent email alert with ${jobs.length} matches.`);
     return true;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
