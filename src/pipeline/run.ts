@@ -28,6 +28,7 @@ export interface RunSummary {
   rejected: number;
   failed: number;
   stored: number;
+  matchedCandidates: MatchCandidate[];
 }
 
 export interface PipelineRepository {
@@ -209,7 +210,8 @@ export async function runPipeline(
       matched: 0,
       rejected: 0,
       failed: 0,
-      stored: 0
+      stored: 0,
+      matchedCandidates: []
     };
     const listingsToProcess: JobListing[] = [];
 
@@ -326,6 +328,7 @@ export async function runPipeline(
           if (candidate.match.shouldSave) {
             summary.matched += 1;
             snapshot.matched += 1;
+            summary.matchedCandidates.push(candidate);
           } else {
             summary.rejected += 1;
             snapshot.rejected += 1;

@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsup src/cli.ts --format esm --dts --clean",
     "dev": "tsx src/cli.ts scrape",
+    "test:email": "tsx src/scripts/test-email.ts",
     "dev:ui": "vite",
     "build:ui": "vite build",
     "report": "tsx src/cli.ts report",

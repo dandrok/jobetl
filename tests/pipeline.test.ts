@@ -434,7 +434,8 @@ describe("runPipeline", () => {
       matched: 0,
       rejected: 1,
       failed: 0,
-      stored: 3
+      stored: 3,
+      matchedCandidates: expect.any(Array)
     });
     expect(fetchOfferMarkdown).toHaveBeenCalledTimes(1);
     expect(fetchOfferMarkdown).toHaveBeenCalledWith(freshListing.url);
@@ -472,7 +473,8 @@ describe("runPipeline", () => {
       matched: 0,
       rejected: 0,
       failed: 0,
-      stored: 2
+      stored: 2,
+      matchedCandidates: expect.any(Array)
     });
     expect(loadResumeMarkdown).not.toHaveBeenCalled();
   });
@@ -524,7 +526,8 @@ describe("runPipeline", () => {
       matched: 1,
       rejected: 0,
       failed: 0,
-      stored: 1
+      stored: 1,
+      matchedCandidates: expect.any(Array)
     });
     expect(fetchOfferMarkdown).toHaveBeenCalledTimes(1);
     expect(scoreOffer).toHaveBeenCalledTimes(1);
@@ -558,7 +561,8 @@ describe("runPipeline", () => {
       matched: 1,
       rejected: 0,
       failed: 1,
-      stored: 2
+      stored: 2,
+      matchedCandidates: expect.any(Array)
     });
     expect(scoreOffer).toHaveBeenCalledTimes(2);
     expect(repository.jobs.get(brokenListing.externalId)?.status).toBe("error");
@@ -591,7 +595,8 @@ describe("runPipeline", () => {
       matched: 1,
       rejected: 0,
       failed: 1,
-      stored: 2
+      stored: 2,
+      matchedCandidates: expect.any(Array)
     });
     expect(fetchOfferMarkdown).toHaveBeenCalledTimes(2);
     expect(repository.jobs.get(brokenListing.externalId)?.status).toBe("error");
@@ -722,7 +727,8 @@ describe("runPipeline", () => {
       matched: 1,
       rejected: 0,
       failed: 0,
-      stored: 2
+      stored: 2,
+      matchedCandidates: expect.any(Array)
     });
     expect(snapshots.at(-1)).toEqual({
       stage: "done",
@@ -843,7 +849,8 @@ describe("runPipeline", () => {
       matched: 3,
       rejected: 0,
       failed: 0,
-      stored: 3
+      stored: 3,
+      matchedCandidates: expect.any(Array)
     });
     expect(maxActiveFetches).toBe(2);
     expect(maxActiveScores).toBe(1);

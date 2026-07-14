@@ -2,7 +2,8 @@ import { parseCliOptions } from "@core/cli-options";
 import { config } from "@core/config";
 import { MultilineProgressReporter } from "@progress/multiline-progress-reporter";
 import { runPipeline } from "@pipeline/run";
-import { loadNotionSyncEnv } from "@core/env";
+import { loadNotionSyncEnv, loadRuntimeEnv } from "@core/env";
+import { sendNewsletter } from "@core/email";
 import { NotionDatabaseClient } from "@notion/client";
 import { NotionSyncProgressReporter } from "@notion/progress-reporter";
 import { syncJobsToNotion } from "@notion/sync";
@@ -24,6 +25,10 @@ async function main(): Promise<void> {
       progress.succeed(
         `Done: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
       );
+      if (summary.matchedCandidates.length > 0) {
+        const env = loadRuntimeEnv();
+        await sendNewsletter(summary.matchedCandidates, env);
+      }
       console.log(JSON.stringify(summary, null, 2));
     } catch (e: unknown) {
       progress.fail(e instanceof Error ? e.message : String(e));
