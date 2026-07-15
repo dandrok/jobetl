@@ -19,7 +19,8 @@
     onNotInterestedFilterChange,
     minScore = $bindable(0),
     maxScore = $bindable(100),
-    sourceCounts = {}
+    sourceCounts = {},
+    onLogout
   } = $props<{
     currentFilter: "matched" | "all" | "rejected" | "applied" | "not-interested";
     onFilterChange: (f: "matched" | "all" | "rejected" | "applied" | "not-interested") => void;
@@ -36,6 +37,7 @@
     minScore?: number;
     maxScore?: number;
     sourceCounts?: Record<string, number>;
+    onLogout?: () => void;
   }>();
 
   let windowWidth = $state(0);
@@ -302,5 +304,28 @@
         </div>
       </div>
     </div>
+
+    {#if onLogout}
+      <div class="p-6 border-t border-(--border-subtle) bg-(--bg-surface) flex items-center">
+        <button
+          onclick={onLogout}
+          class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-(--text-secondary) hover:text-(--danger) transition-colors cursor-pointer w-full text-left"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          Log Out
+        </button>
+      </div>
+    {/if}
   </nav>
 {/if}
