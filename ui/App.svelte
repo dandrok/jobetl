@@ -8,7 +8,7 @@
   import Login from "./components/Login.svelte";
   import "./app.css";
 
-  let isAuthenticated = $state(true);
+  let isAuthenticated = $state<boolean | null>(null);
 
   let allJobs = $state<StoredJob[]>([]);
   let currentFilter = $state<"matched" | "all" | "rejected" | "applied" | "not-interested">(
@@ -57,18 +57,31 @@
     selectedJob = null;
   }
 
-  async function toggleApply(id: string, isApplied: boolean) {
+  async function authFetch(url: string, init?: RequestInit): Promise<Response | null> {
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isApplied }),
+      const res = await fetch(url, {
+        ...init,
         credentials: "include"
       });
       if (res.status === 401) {
         clearSession();
-        return;
+        return null;
       }
+      return res;
+    } catch (err) {
+      console.error(`Request to ${url} failed:`, err);
+      throw err;
+    }
+  }
+
+  async function toggleApply(id: string, isApplied: boolean) {
+    try {
+      const res = await authFetch(`/api/jobs/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isApplied })
+      });
+      if (!res) return;
       if (res.ok) {
         // Update local state instantly
         const jobIndex = allJobs.findIndex((j) => j.externalId === id);
@@ -88,16 +101,12 @@
 
   async function toggleNotInterested(id: string, isNotInterested: boolean) {
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
+      const res = await authFetch(`/api/jobs/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isNotInterested }),
-        credentials: "include"
+        body: JSON.stringify({ isNotInterested })
       });
-      if (res.status === 401) {
-        clearSession();
-        return;
-      }
+      if (!res) return;
       if (res.ok) {
         // Update local state instantly
         const jobIndex = allJobs.findIndex((j) => j.externalId === id);
@@ -191,18 +200,19 @@
     isLoading = true;
     error = null;
     try {
-      const res = await fetch("/api/jobs", { credentials: "include" });
-      if (res.status === 401) {
-        clearSession();
-        return;
-      }
+      const res = await authFetch("/api/jobs");
+      if (!res) return;
       if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
       allJobs = await res.json();
       // Initialize sources check
       const sources = [...new Set(allJobs.map((j) => j.source))].filter(Boolean);
       selectedSources = new Set(sources);
+      isAuthenticated = true;
     } catch (err: any) {
       error = err.message;
+      if (isAuthenticated === null) {
+        isAuthenticated = false;
+      }
     } finally {
       isLoading = false;
     }
@@ -303,7 +313,13 @@
   }
 </script>
 
-{#if !isAuthenticated}
+{#if isAuthenticated === null}
+  <div class="fixed inset-0 flex items-center justify-center bg-(--bg-base) transition-theme">
+    <div class="text-center text-(--text-tertiary) font-serif italic text-xl">
+      Verifying session...
+    </div>
+  </div>
+{:else if isAuthenticated === false}
   <Login
     onLoginSuccess={() => {
       isAuthenticated = true;

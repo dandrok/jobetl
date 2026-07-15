@@ -10,7 +10,7 @@ const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // In-memory rate limiting map: IP -> array of timestamps of attempts
 const loginAttempts = new Map<string, number[]>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const MAX_LOGIN_ATTEMPTS = 5;
 
 // Periodically clean up expired entries from maps (unref to not block process termination)
@@ -45,7 +45,12 @@ function parseCookies(req: IncomingMessage): Record<string, string> {
       const parts = cookie.split("=");
       const key = parts.shift()?.trim();
       if (key) {
-        list[key] = decodeURI(parts.join("="));
+        try {
+          list[key] = decodeURIComponent(parts.join("="));
+        } catch {
+          // If decoding fails, fallback to raw string to avoid crashing the server
+          list[key] = parts.join("=");
+        }
       }
     });
   }
@@ -72,16 +77,19 @@ export function startServer() {
   const repository = new PostgresJobRepository(config.databaseUrl);
 
   const server = createServer((req, res) => {
-    // Add CORS headers to support cookie-based sessions from local Vite dev server (port 3000)
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+    // Add CORS headers to support cookie-based sessions from local Vite dev server
+    if (process.env.NODE_ENV !== "production") {
+      const allowedOrigin = process.env.CORS_ALLOWED_ORIGIN || "http://localhost:3000";
+      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
 
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return;
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
     }
 
     // Route: POST /api/login
@@ -93,7 +101,10 @@ export function startServer() {
         body += chunk.toString();
         if (body.length > 65536) {
           tooLarge = true;
-          res.writeHead(413, { "Content-Type": "application/json" });
+          res.writeHead(413, {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store, no-cache, must-revalidate, private"
+          });
           res.end(JSON.stringify({ error: "Payload Too Large" }));
           req.destroy();
         }
@@ -106,31 +117,38 @@ export function startServer() {
             try {
               data = JSON.parse(body) as { password?: string };
             } catch {
-              res.writeHead(400, { "Content-Type": "application/json" });
+              res.writeHead(400, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
               res.end(JSON.stringify({ error: "Bad Request: Invalid JSON" }));
               return;
             }
 
             const hash = process.env.DASHBOARD_PASSWORD_HASH;
             if (!hash || !data.password) {
-              res.writeHead(400, { "Content-Type": "application/json" });
+              res.writeHead(400, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
               res.end(JSON.stringify({ error: "Missing password or server configuration" }));
               return;
             }
 
             // Per-source rate limiting using client IP address
-            const ip = (
-              (req.headers["x-forwarded-for"] as string) ||
-              req.socket.remoteAddress ||
-              "unknown"
-            )
-              .split(",")[0]
-              .trim();
+            const trustProxy = process.env.TRUST_PROXY === "true";
+            const ip =
+              trustProxy && req.headers["x-forwarded-for"]
+                ? (req.headers["x-forwarded-for"] as string).split(",")[0].trim()
+                : req.socket.remoteAddress || "unknown";
             const now = Date.now();
             const attempts = loginAttempts.get(ip) || [];
             const recentAttempts = attempts.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
             if (recentAttempts.length >= MAX_LOGIN_ATTEMPTS) {
-              res.writeHead(429, { "Content-Type": "application/json" });
+              res.writeHead(429, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
               res.end(
                 JSON.stringify({ error: "Too many login attempts. Please try again later." })
               );
@@ -151,17 +169,25 @@ export function startServer() {
 
               res.writeHead(200, {
                 "Set-Cookie": cookieValue,
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
               });
               res.end(JSON.stringify({ success: true }));
             } else {
-              res.writeHead(401, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Invalid password" }));
+              const remaining = MAX_LOGIN_ATTEMPTS - recentAttempts.length;
+              res.writeHead(401, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
+              res.end(JSON.stringify({ error: "Invalid password", remainingAttempts: remaining }));
             }
           } catch (e: unknown) {
             console.error("Login failed:", e);
-            res.writeHead(500);
-            res.end("Internal Server Error");
+            res.writeHead(500, {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store, no-cache, must-revalidate, private"
+            });
+            res.end(JSON.stringify({ error: "Internal Server Error" }));
           }
         })();
       });
@@ -175,9 +201,14 @@ export function startServer() {
       if (sessionId) {
         activeSessions.delete(sessionId);
       }
+      const isProd = process.env.NODE_ENV === "production";
+      const logoutCookie = `session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict${
+        isProd ? "; Secure" : ""
+      }`;
       res.writeHead(200, {
-        "Set-Cookie": "session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict",
-        "Content-Type": "application/json"
+        "Set-Cookie": logoutCookie,
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, private"
       });
       res.end(JSON.stringify({ success: true }));
       return;

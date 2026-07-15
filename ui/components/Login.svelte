@@ -36,7 +36,18 @@
       if (res.ok && data.success) {
         onLoginSuccess();
       } else {
-        errorMessage = data.error || "Login failed. Please check your password.";
+        const remaining = data.remainingAttempts;
+        if (remaining !== undefined && res.status === 401) {
+          if (remaining === 0) {
+            errorMessage = "Invalid password. No attempts remaining. Please try again in 1 hour.";
+          } else if (remaining <= 3) {
+            errorMessage = `Invalid password. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining before lockout.`;
+          } else {
+            errorMessage = data.error || "Login failed. Please check your password.";
+          }
+        } else {
+          errorMessage = data.error || "Login failed. Please check your password.";
+        }
       }
     } catch (err: unknown) {
       errorMessage = "Network error. Make sure the backend server is running.";

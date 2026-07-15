@@ -160,7 +160,7 @@
 
       {#if activeJob?.url}
         <a
-          href={activeJob.url}
+          href={activeJob.url.startsWith("http") ? activeJob.url : "#"}
           target="_blank"
           rel="noopener noreferrer"
           class="inline-flex items-center gap-2 bg-(--text-primary) text-(--bg-base) px-6 py-3.5 rounded-lg text-[0.95rem] font-medium hover:opacity-90 transition-opacity duration-200"
