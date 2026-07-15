@@ -5,7 +5,10 @@
   import type { StoredJob } from "./types";
   import JobCard from "./components/JobCard.svelte";
   import Drawer from "./components/Drawer.svelte";
+  import Login from "./components/Login.svelte";
   import "./app.css";
+
+  let isAuthenticated = $state<boolean | null>(null);
 
   let allJobs = $state<StoredJob[]>([]);
   let currentFilter = $state<"matched" | "all" | "rejected" | "applied" | "not-interested">(
@@ -48,13 +51,37 @@
   let error = $state<string | null>(null);
   let selectedJob = $state<StoredJob | null>(null);
 
+  function clearSession() {
+    isAuthenticated = false;
+    allJobs = [];
+    selectedJob = null;
+  }
+
+  async function authFetch(url: string, init?: RequestInit): Promise<Response | null> {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        credentials: "include"
+      });
+      if (res.status === 401) {
+        clearSession();
+        return null;
+      }
+      return res;
+    } catch (err) {
+      console.error(`Request to ${url} failed:`, err);
+      throw err;
+    }
+  }
+
   async function toggleApply(id: string, isApplied: boolean) {
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
+      const res = await authFetch(`/api/jobs/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isApplied })
       });
+      if (!res) return;
       if (res.ok) {
         // Update local state instantly
         const jobIndex = allJobs.findIndex((j) => j.externalId === id);
@@ -74,11 +101,12 @@
 
   async function toggleNotInterested(id: string, isNotInterested: boolean) {
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(id)}`, {
+      const res = await authFetch(`/api/jobs/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isNotInterested })
       });
+      if (!res) return;
       if (res.ok) {
         // Update local state instantly
         const jobIndex = allJobs.findIndex((j) => j.externalId === id);
@@ -169,17 +197,34 @@
   });
 
   async function fetchJobs() {
+    isLoading = true;
+    error = null;
     try {
-      const res = await fetch("/api/jobs");
+      const res = await authFetch("/api/jobs");
+      if (!res) return;
       if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
       allJobs = await res.json();
       // Initialize sources check
       const sources = [...new Set(allJobs.map((j) => j.source))].filter(Boolean);
       selectedSources = new Set(sources);
+      isAuthenticated = true;
     } catch (err: any) {
       error = err.message;
+      if (isAuthenticated === null) {
+        isAuthenticated = false;
+      }
     } finally {
       isLoading = false;
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+    } catch (err) {
+      console.error("Failed to log out:", err);
+    } finally {
+      clearSession();
     }
   }
 
@@ -268,140 +313,160 @@
   }
 </script>
 
-<div class="flex min-h-screen w-full bg-(--bg-base) transition-theme relative">
-  <Sidebar
-    {currentFilter}
-    onFilterChange={handleFilterChange}
-    {allSources}
-    {selectedSources}
-    onToggleSource={toggleSource}
-    onToggleTheme={toggleTheme}
-    isCollapsed={isSidebarCollapsed}
-    onClose={() => (isSidebarCollapsed = true)}
-    {appliedFilter}
-    onAppliedFilterChange={handleAppliedFilterChange}
-    {notInterestedFilter}
-    onNotInterestedFilterChange={handleNotInterestedFilterChange}
-    bind:minScore
-    bind:maxScore
-    {sourceCounts}
+{#if isAuthenticated === null}
+  <div class="fixed inset-0 flex items-center justify-center bg-(--bg-base) transition-theme">
+    <div class="text-center text-(--text-tertiary) font-serif italic text-xl">
+      Verifying session...
+    </div>
+  </div>
+{:else if isAuthenticated === false}
+  <Login
+    onLoginSuccess={() => {
+      isAuthenticated = true;
+      fetchJobs();
+    }}
   />
-
-  <main
-    class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full transition-panel {!isSidebarCollapsed
-      ? 'lg:ml-[280px]'
-      : ''}"
-  >
-    <Header
+{:else}
+  <div class="flex min-h-screen w-full bg-(--bg-base) transition-theme relative">
+    <Sidebar
       {currentFilter}
-      {currentSort}
-      onSortChange={(s) => (currentSort = s)}
-      {searchQuery}
-      onSearchChange={(q) => (searchQuery = q)}
-      onToggleSidebar={toggleSidebar}
-      {isSidebarCollapsed}
-      {minScore}
-      {maxScore}
-      onResetScoreRange={resetScoreRange}
+      onFilterChange={handleFilterChange}
+      {allSources}
+      {selectedSources}
+      onToggleSource={toggleSource}
+      onToggleTheme={toggleTheme}
+      isCollapsed={isSidebarCollapsed}
+      onClose={() => (isSidebarCollapsed = true)}
+      {appliedFilter}
+      onAppliedFilterChange={handleAppliedFilterChange}
+      {notInterestedFilter}
+      onNotInterestedFilterChange={handleNotInterestedFilterChange}
+      bind:minScore
+      bind:maxScore
+      {sourceCounts}
+      onLogout={handleLogout}
     />
 
-    <div class="p-4 md:p-8 xl:px-12 flex flex-col gap-6 md:gap-10 w-full">
-      <section aria-label="Dashboard Metrics">
-        <Metrics
-          {totalEvaluated}
-          {totalMatched}
-          {totalApplied}
-          {totalNotInterested}
-          {avgScore}
-          {rejectRate}
-          {currentFilter}
-          {appliedFilter}
-          {notInterestedFilter}
-          onMetricClick={handleFilterChange}
-        />
-      </section>
+    <main
+      class="flex-1 flex flex-col min-w-0 relative bg-(--bg-base) w-full transition-panel {!isSidebarCollapsed
+        ? 'lg:ml-[280px]'
+        : ''}"
+    >
+      <Header
+        {currentFilter}
+        {currentSort}
+        onSortChange={(s) => (currentSort = s)}
+        {searchQuery}
+        onSearchChange={(q) => (searchQuery = q)}
+        onToggleSidebar={toggleSidebar}
+        {isSidebarCollapsed}
+        {minScore}
+        {maxScore}
+        onResetScoreRange={resetScoreRange}
+      />
 
-      <section
-        aria-label="Job Listings"
-        class="bg-transparent md:bg-(--bg-surface) md:border md:border-(--border-subtle) rounded-2xl overflow-visible md:overflow-hidden w-full transition-theme shadow-sm"
-      >
-        <!-- Desktop Header -->
-        <header
-          class="hidden md:grid grid-cols-[80px_3fr_2fr_1fr] px-6 py-4 border-b border-(--border-subtle) bg-(--bg-surface) text-[0.75rem] text-(--text-tertiary) font-semibold uppercase tracking-[0.05em] w-full min-w-0"
+      <div class="p-4 md:p-8 xl:px-12 flex flex-col gap-6 md:gap-10 w-full">
+        <section aria-label="Dashboard Metrics">
+          <Metrics
+            {totalEvaluated}
+            {totalMatched}
+            {totalApplied}
+            {totalNotInterested}
+            {avgScore}
+            {rejectRate}
+            {currentFilter}
+            {appliedFilter}
+            {notInterestedFilter}
+            onMetricClick={handleFilterChange}
+          />
+        </section>
+
+        <section
+          aria-label="Job Listings"
+          class="bg-transparent md:bg-(--bg-surface) md:border md:border-(--border-subtle) rounded-2xl overflow-visible md:overflow-hidden w-full transition-theme shadow-sm"
         >
-          <div class="min-w-0">Score</div>
-          <div class="min-w-0">Role & Company</div>
-          <div class="min-w-0">Key Details</div>
-          <div class="text-right min-w-0">Action</div>
-        </header>
+          <!-- Desktop Header -->
+          <header
+            class="hidden md:grid grid-cols-[80px_3fr_2fr_1fr] px-6 py-4 border-b border-(--border-subtle) bg-(--bg-surface) text-[0.75rem] text-(--text-tertiary) font-semibold uppercase tracking-[0.05em] w-full min-w-0"
+          >
+            <div class="min-w-0">Score</div>
+            <div class="min-w-0">Role & Company</div>
+            <div class="min-w-0">Key Details</div>
+            <div class="text-right min-w-0">Action</div>
+          </header>
 
-        <div class="flex flex-col w-full">
-          {#if isLoading}
-            <div class="py-20 px-4 text-center text-(--text-tertiary) font-serif italic text-xl">
-              Loading intelligence...
-            </div>
-          {:else if error}
-            <div class="py-20 px-4 text-center text-(--danger) font-serif italic text-xl">
-              {error}
-            </div>
-          {:else if filteredJobs.length === 0}
-            <div
-              class="py-16 px-6 text-center flex flex-col items-center justify-center gap-4 max-w-md mx-auto w-full"
-            >
+          <div class="flex flex-col w-full">
+            {#if isLoading}
+              <div class="py-20 px-4 text-center text-(--text-tertiary) font-serif italic text-xl">
+                Loading intelligence...
+              </div>
+            {:else if error}
+              <div class="py-20 px-4 text-center text-(--danger) font-serif italic text-xl">
+                {error}
+              </div>
+            {:else if filteredJobs.length === 0}
               <div
-                class="w-12 h-12 rounded-full bg-(--accent-light) text-(--accent) flex items-center justify-center border border-(--accent)/10"
+                class="py-16 px-6 text-center flex flex-col items-center justify-center gap-4 max-w-md mx-auto w-full"
               >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
+                <div
+                  class="w-12 h-12 rounded-full bg-(--accent-light) text-(--accent) flex items-center justify-center border border-(--accent)/10"
                 >
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-              </div>
-              <div class="flex flex-col gap-1.5">
-                <h3 class="text-lg font-semibold text-(--text-primary)">No Matching Jobs</h3>
-                <p class="text-sm text-(--text-secondary) leading-relaxed">
-                  Try adjusting your filters, score range, or search query to find matching job
-                  opportunities.
-                </p>
-              </div>
-              <button
-                onclick={resetAllFilters}
-                class="mt-2 px-5 py-2.5 bg-(--accent) hover:opacity-90 text-(--bg-base) font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm cursor-pointer outline-none"
-              >
-                Reset Filters
-              </button>
-            </div>
-          {:else}
-            {#key currentFilter}
-              <div in:fade={{ duration: 150 }} class="flex flex-col w-full">
-                {#each filteredJobs as job (job.externalId)}
-                  <div
-                    animate:flip={{ duration: 300 }}
-                    transition:fade={{ duration: 150 }}
-                    class="w-full"
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
                   >
-                    <JobCard {job} onToggleApply={toggleApply} onClick={(j) => (selectedJob = j)} />
-                  </div>
-                {/each}
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <h3 class="text-lg font-semibold text-(--text-primary)">No Matching Jobs</h3>
+                  <p class="text-sm text-(--text-secondary) leading-relaxed">
+                    Try adjusting your filters, score range, or search query to find matching job
+                    opportunities.
+                  </p>
+                </div>
+                <button
+                  onclick={resetAllFilters}
+                  class="mt-2 px-5 py-2.5 bg-(--accent) hover:opacity-95 text-(--bg-base) font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm cursor-pointer outline-none"
+                >
+                  Reset Filters
+                </button>
               </div>
-            {/key}
-          {/if}
-        </div>
-      </section>
-    </div>
-  </main>
-</div>
+            {:else}
+              {#key currentFilter}
+                <div in:fade={{ duration: 150 }} class="flex flex-col w-full">
+                  {#each filteredJobs as job (job.externalId)}
+                    <div
+                      animate:flip={{ duration: 300 }}
+                      transition:fade={{ duration: 150 }}
+                      class="w-full"
+                    >
+                      <JobCard
+                        {job}
+                        onToggleApply={toggleApply}
+                        onClick={(j) => (selectedJob = j)}
+                      />
+                    </div>
+                  {/each}
+                </div>
+              {/key}
+            {/if}
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
 
-<Drawer
-  job={selectedJob}
-  isOpen={selectedJob !== null}
-  onClose={() => (selectedJob = null)}
-  onToggleApply={toggleApply}
-  onToggleNotInterested={toggleNotInterested}
-/>
+  <Drawer
+    job={selectedJob}
+    isOpen={selectedJob !== null}
+    onClose={() => (selectedJob = null)}
+    onToggleApply={toggleApply}
+    onToggleNotInterested={toggleNotInterested}
+  />
+{/if}

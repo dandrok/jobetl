@@ -1,19 +1,223 @@
-import { createServer } from "node:http";
+import { createServer, IncomingMessage } from "node:http";
+import { randomBytes } from "node:crypto";
+import * as argon2 from "argon2";
 import { config } from "@core/config";
 import { PostgresJobRepository } from "@storage/postgres-job-repository";
+
+// In-memory session store (Active sessions map to expiry timestamp)
+const activeSessions = new Map<string, number>();
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// In-memory rate limiting map: IP -> array of timestamps of attempts
+const loginAttempts = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const MAX_LOGIN_ATTEMPTS = 5;
+
+// Periodically clean up expired entries from maps (unref to not block process termination)
+const gcInterval = setInterval(
+  () => {
+    const now = Date.now();
+    for (const [sessionId, expiry] of activeSessions.entries()) {
+      if (now > expiry) {
+        activeSessions.delete(sessionId);
+      }
+    }
+    for (const [ip, attempts] of loginAttempts.entries()) {
+      const validAttempts = attempts.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+      if (validAttempts.length === 0) {
+        loginAttempts.delete(ip);
+      } else {
+        loginAttempts.set(ip, validAttempts);
+      }
+    }
+  },
+  60 * 60 * 1000
+);
+gcInterval.unref();
+
+// Helper to parse cookies from request headers
+function parseCookies(req: IncomingMessage): Record<string, string> {
+  const list: Record<string, string> = {};
+  const rc = req.headers.cookie;
+
+  if (rc) {
+    rc.split(";").forEach((cookie) => {
+      const parts = cookie.split("=");
+      const key = parts.shift()?.trim();
+      if (key) {
+        try {
+          list[key] = decodeURIComponent(parts.join("="));
+        } catch {
+          // If decoding fails, fallback to raw string to avoid crashing the server
+          list[key] = parts.join("=");
+        }
+      }
+    });
+  }
+  return list;
+}
+
+// Helper to validate session
+function isAuthenticated(req: IncomingMessage): boolean {
+  const cookies = parseCookies(req);
+  const sessionId = cookies.session_id;
+  if (!sessionId) return false;
+
+  const expiry = activeSessions.get(sessionId);
+  if (!expiry) return false;
+
+  if (Date.now() > expiry) {
+    activeSessions.delete(sessionId);
+    return false;
+  }
+  return true;
+}
 
 export function startServer() {
   const repository = new PostgresJobRepository(config.databaseUrl);
 
   const server = createServer((req, res) => {
-    // Add basic CORS headers for local development if Vite is running on a different port
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-    res.setHeader("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    // Add CORS headers to support cookie-based sessions from local Vite dev server
+    if (process.env.NODE_ENV !== "production") {
+      const allowedOrigin = process.env.CORS_ALLOWED_ORIGIN || "http://localhost:3000";
+      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
 
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+    }
+
+    // Route: POST /api/login
+    if (req.url === "/api/login" && req.method === "POST") {
+      let body = "";
+      let tooLarge = false;
+      req.on("data", (chunk) => {
+        if (tooLarge) return;
+        body += chunk.toString();
+        if (body.length > 65536) {
+          tooLarge = true;
+          res.writeHead(413, {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store, no-cache, must-revalidate, private"
+          });
+          res.end(JSON.stringify({ error: "Payload Too Large" }));
+          req.destroy();
+        }
+      });
+      req.on("end", () => {
+        if (tooLarge) return;
+        (async () => {
+          try {
+            let data: { password?: string };
+            try {
+              data = JSON.parse(body) as { password?: string };
+            } catch {
+              res.writeHead(400, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
+              res.end(JSON.stringify({ error: "Bad Request: Invalid JSON" }));
+              return;
+            }
+
+            const hash = process.env.DASHBOARD_PASSWORD_HASH;
+            if (!hash || !data.password) {
+              res.writeHead(400, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
+              res.end(JSON.stringify({ error: "Missing password or server configuration" }));
+              return;
+            }
+
+            // Per-source rate limiting using client IP address
+            const trustProxy = process.env.TRUST_PROXY === "true";
+            const ip =
+              trustProxy && req.headers["x-forwarded-for"]
+                ? (req.headers["x-forwarded-for"] as string).split(",")[0].trim()
+                : req.socket.remoteAddress || "unknown";
+            const now = Date.now();
+            const attempts = loginAttempts.get(ip) || [];
+            const recentAttempts = attempts.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+            if (recentAttempts.length >= MAX_LOGIN_ATTEMPTS) {
+              res.writeHead(429, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
+              res.end(
+                JSON.stringify({ error: "Too many login attempts. Please try again later." })
+              );
+              return;
+            }
+            recentAttempts.push(now);
+            loginAttempts.set(ip, recentAttempts);
+
+            const isValid = await argon2.verify(hash, data.password);
+            if (isValid) {
+              const sessionId = randomBytes(24).toString("hex");
+              activeSessions.set(sessionId, Date.now() + SESSION_EXPIRY_MS);
+
+              const isProd = process.env.NODE_ENV === "production";
+              const cookieValue = `session_id=${sessionId}; HttpOnly; Path=/; Max-Age=${SESSION_EXPIRY_MS / 1000}; SameSite=Strict${
+                isProd ? "; Secure" : ""
+              }`;
+
+              res.writeHead(200, {
+                "Set-Cookie": cookieValue,
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
+              res.end(JSON.stringify({ success: true }));
+            } else {
+              const remaining = MAX_LOGIN_ATTEMPTS - recentAttempts.length;
+              res.writeHead(401, {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store, no-cache, must-revalidate, private"
+              });
+              res.end(JSON.stringify({ error: "Invalid password", remainingAttempts: remaining }));
+            }
+          } catch (e: unknown) {
+            console.error("Login failed:", e);
+            res.writeHead(500, {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store, no-cache, must-revalidate, private"
+            });
+            res.end(JSON.stringify({ error: "Internal Server Error" }));
+          }
+        })();
+      });
+      return;
+    }
+
+    // Route: POST /api/logout
+    if (req.url === "/api/logout" && req.method === "POST") {
+      const cookies = parseCookies(req);
+      const sessionId = cookies.session_id;
+      if (sessionId) {
+        activeSessions.delete(sessionId);
+      }
+      const isProd = process.env.NODE_ENV === "production";
+      const logoutCookie = `session_id=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict${
+        isProd ? "; Secure" : ""
+      }`;
+      res.writeHead(200, {
+        "Set-Cookie": logoutCookie,
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, private"
+      });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    // Authentication Guard on all job resources
+    if (!isAuthenticated(req)) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unauthorized" }));
       return;
     }
 
