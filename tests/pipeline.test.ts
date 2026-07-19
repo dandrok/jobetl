@@ -13,7 +13,7 @@ import type {
   JobStatus,
   MatchResult,
   PipelineProgressSnapshot,
-  RunConfig,
+  ProfileRunConfig,
   StoredJob
 } from "@core/types";
 
@@ -37,17 +37,19 @@ function createTempDir(): string {
   return dir;
 }
 
-function createConfig(): RunConfig {
+function createConfig(): ProfileRunConfig {
   const dir = createTempDir();
   const resumeMarkdownPath = join(dir, "resume.md");
   writeFileSync(resumeMarkdownPath, "# Resume\n\nNode.js and ETL");
 
   return {
+    profileId: "software",
     databaseUrl: "postgres://localhost:5432/test",
     resumeMarkdownPath,
     matchThreshold: 0.75,
     fetchConcurrency: 1,
     scoreConcurrency: 1,
+    emailSubjectPrefix: "JobETL [software]",
     sources: {
       justjoinit: {
         enabled: true,

@@ -136,10 +136,19 @@ function compileHtmlTemplate(jobs: MatchCandidate[]): string {
   `;
 }
 
+export interface SendNewsletterOptions {
+  /** When set, used as `${prefix}: N New Job Match(es) Found!` */
+  subjectPrefix?: string;
+}
+
 /**
  * Sends a newsletter of matched jobs using Resend API.
  */
-export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): Promise<boolean> {
+export async function sendNewsletter(
+  jobs: MatchCandidate[],
+  env: RuntimeEnv,
+  options: SendNewsletterOptions = {}
+): Promise<boolean> {
   if (jobs.length === 0) {
     return true;
   }
@@ -153,7 +162,8 @@ export async function sendNewsletter(jobs: MatchCandidate[], env: RuntimeEnv): P
     return false;
   }
 
-  const subject = `🔥 JobETL: ${jobs.length} New Job Match${jobs.length > 1 ? "es" : ""} Found!`;
+  const prefix = options.subjectPrefix?.trim() || "JobETL";
+  const subject = `🔥 ${prefix}: ${jobs.length} New Job Match${jobs.length > 1 ? "es" : ""} Found!`;
   const htmlContent = compileHtmlTemplate(jobs);
 
   const controller = new AbortController();

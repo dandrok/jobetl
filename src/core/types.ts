@@ -137,13 +137,43 @@ export interface SourceConfigMap {
 
 export type SourceConfigFor<T extends JobSource> = SourceConfigMap[T];
 
+/** Built-in profile ids; config may add more string keys later. */
+export const PROFILE_IDS = ["software", "ai"] as const;
+export type BuiltinProfileId = (typeof PROFILE_IDS)[number];
+export type ProfileId = string;
+
+export interface ProfileConfig {
+  enabled: boolean;
+  resumeMarkdownPath: string;
+  matchThreshold: number;
+  emailSubjectPrefix: string;
+  sources: SourceConfigMap;
+}
+
+/**
+ * Global scrape config: shared DB/concurrency + named profiles.
+ * Each profile owns its resume/match brief, threshold, and source filters.
+ */
 export interface RunConfig {
+  databaseUrl: string;
+  fetchConcurrency: number;
+  scoreConcurrency: number;
+  profiles: Record<ProfileId, ProfileConfig>;
+}
+
+/**
+ * Resolved inputs for a single pipeline execution (one profile).
+ * Pipeline code uses this shape so it stays independent of multi-profile orchestration.
+ */
+export interface ProfileRunConfig {
+  profileId: ProfileId;
   databaseUrl: string;
   resumeMarkdownPath: string;
   matchThreshold: number;
   fetchConcurrency: number;
   scoreConcurrency: number;
   sources: SourceConfigMap;
+  emailSubjectPrefix: string;
 }
 
 export interface RuntimeEnv {

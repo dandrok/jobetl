@@ -1,7 +1,8 @@
 import { parseCliOptions } from "@core/cli-options";
 import { config } from "@core/config";
+import { buildProfileRunConfig, listProfileIds, resolveProfilesToRun } from "@core/profiles";
 import { MultilineProgressReporter } from "@progress/multiline-progress-reporter";
-import { runPipeline } from "@pipeline/run";
+import { runPipeline, type RunSummary } from "@pipeline/run";
 import { loadNotionSyncEnv, loadRuntimeEnv } from "@core/env";
 import { sendNewsletter } from "@core/email";
 import { NotionDatabaseClient } from "@notion/client";
@@ -20,16 +21,29 @@ async function main(): Promise<void> {
   if (command === "scrape") {
     const progress = new MultilineProgressReporter();
     try {
-      const options = parseCliOptions(scrapeArgs);
-      const summary = await runPipeline(config, progress, undefined, options);
-      progress.succeed(
-        `Done: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
-      );
-      if (summary.matchedCandidates.length > 0) {
-        const env = loadRuntimeEnv();
-        await sendNewsletter(summary.matchedCandidates, env);
+      const options = parseCliOptions(scrapeArgs, listProfileIds(config));
+      // Sequential multi-profile for now (parallel + profile-aware re-score in later loops).
+      // Note: jobs already matched/rejected by an earlier profile are skipped until
+      // profile-aware skip rules land — AI-only discovery still processes new listings.
+      const profileIds = resolveProfilesToRun(config, options.profile);
+      const summaries: Array<{ profileId: string } & RunSummary> = [];
+
+      for (const profileId of profileIds) {
+        const profileConfig = buildProfileRunConfig(config, profileId);
+        const summary = await runPipeline(profileConfig, progress, undefined, options);
+        progress.succeed(
+          `Done [${profileId}]: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
+        );
+        if (summary.matchedCandidates.length > 0) {
+          const env = loadRuntimeEnv();
+          await sendNewsletter(summary.matchedCandidates, env, {
+            subjectPrefix: profileConfig.emailSubjectPrefix
+          });
+        }
+        summaries.push({ profileId, ...summary });
       }
-      console.log(JSON.stringify(summary, null, 2));
+
+      console.log(JSON.stringify(summaries.length === 1 ? summaries[0] : summaries, null, 2));
     } catch (e: unknown) {
       progress.fail(e instanceof Error ? e.message : String(e));
       process.exitCode = 1;

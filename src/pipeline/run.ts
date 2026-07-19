@@ -17,7 +17,7 @@ import type {
   MatchCandidate,
   MatchResult,
   PipelineProgressSnapshot,
-  RunConfig
+  ProfileRunConfig
 } from "@core/types";
 
 export interface RunSummary {
@@ -101,7 +101,7 @@ function dedupeListings(listings: JobListing[]): JobListing[] {
 }
 
 function createPipelineDependencies(
-  config: RunConfig,
+  config: ProfileRunConfig,
   overrides: Partial<PipelineDependencies> = {}
 ): PipelineDependencies {
   const defaultRepository = new PostgresJobRepository(config.databaseUrl);
@@ -163,7 +163,7 @@ function isFatalDeepSeekError(error: unknown): boolean {
 }
 
 export async function runPipeline(
-  config: RunConfig,
+  config: ProfileRunConfig,
   progress?: ProgressReporter,
   dependencyOverrides: Partial<PipelineDependencies> = {},
   options: RunPipelineOptions = {}

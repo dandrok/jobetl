@@ -1,15 +1,29 @@
-import { JOB_SOURCES, type JobSource, type RunConfig } from "@core/types";
+import {
+  JOB_SOURCES,
+  type JobSource,
+  type ProfileRunConfig,
+  type SourceConfigMap
+} from "@core/types";
 import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
 
+function resolveSourceMap(config: SourceConfigMap | ProfileRunConfig): SourceConfigMap {
+  if ("profileId" in config) {
+    return config.sources;
+  }
+
+  return config;
+}
+
 export function selectSources(
-  config: RunConfig,
+  config: SourceConfigMap | ProfileRunConfig,
   adapters: SourceAdapterMap,
   source?: JobSource
 ): SelectedSource[] {
+  const sourceMap = resolveSourceMap(config);
   const sources = source ? [source] : JOB_SOURCES;
 
   return sources.flatMap((sourceName) => {
-    const sourceConfig = config.sources[sourceName];
+    const sourceConfig = sourceMap[sourceName];
 
     if (!sourceConfig.enabled) {
       if (source) {
