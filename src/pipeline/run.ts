@@ -36,7 +36,7 @@ export interface RunSummary {
 export interface PipelineRepository {
   upsertDiscoveredJob(job: JobListing): Promise<void>;
   getJobStatus(externalId: string): Promise<JobStatus | undefined>;
-  getJob?(externalId: string): Promise<StoredJob | undefined>;
+  getJob(externalId: string): Promise<StoredJob | undefined>;
   markJobFetching(externalId: string): Promise<void>;
   saveFetchedOffer(externalId: string, offerMarkdown: string): Promise<void>;
   markJobScoring(externalId: string): Promise<void>;
@@ -224,11 +224,8 @@ export async function runPipeline(
       await Promise.all(
         batch.map(async (listing) => {
           await dependencies.repository.upsertDiscoveredJob(listing);
-          const existing = dependencies.repository.getJob
-            ? await dependencies.repository.getJob(listing.externalId)
-            : undefined;
-          const currentStatus =
-            existing?.status ?? (await dependencies.repository.getJobStatus(listing.externalId));
+          const existing = await dependencies.repository.getJob(listing.externalId);
+          const currentStatus = existing?.status;
           if (shouldSkipJobForProfile(currentStatus, existing?.profile, config.profileId)) {
             summary.skipped += 1;
             snapshot.skipped += 1;
@@ -336,9 +333,7 @@ export async function runPipeline(
 
         let preserveTerminalStatus = false;
         try {
-          const existingForScore = dependencies.repository.getJob
-            ? await dependencies.repository.getJob(offer.externalId)
-            : undefined;
+          const existingForScore = await dependencies.repository.getJob(offer.externalId);
           const isTerminal =
             existingForScore?.status === "matched" || existingForScore?.status === "rejected";
           preserveTerminalStatus = isTerminal;

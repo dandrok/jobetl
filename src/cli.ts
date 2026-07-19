@@ -22,9 +22,9 @@ async function main(): Promise<void> {
     const progress = new MultilineProgressReporter();
     try {
       const options = parseCliOptions(scrapeArgs, listProfileIds(config));
-      // Sequential multi-profile for now (parallel + profile-aware re-score in later loops).
-      // Note: jobs already matched/rejected by an earlier profile are skipped until
-      // profile-aware skip rules land — AI-only discovery still processes new listings.
+      // Profiles run one after another so merge/skip stay correct when the same job
+      // appears in multiple lanes. Inside each profile, fetch/score stay concurrent.
+      // Each profile may send its own Resend email (same recipient, different subject).
       const profileIds = resolveProfilesToRun(config, options.profile);
       const summaries: Array<{ profileId: string } & RunSummary> = [];
 

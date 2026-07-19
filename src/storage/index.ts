@@ -3,6 +3,7 @@ import type { JobListing, MatchCandidate, StoredJob } from "@core/types";
 export interface JobRepository {
   hasExternalId(externalId: string): Promise<boolean>;
   getJobStatus(externalId: string): Promise<StoredJob["status"] | undefined>;
+  getJob(externalId: string): Promise<StoredJob | undefined>;
   markJobFetching(externalId: string): Promise<void>;
   markJobScoring(externalId: string): Promise<void>;
   markJobError(externalId: string): Promise<void>;
@@ -15,7 +16,6 @@ export interface JobRepository {
   listJobs(): Promise<StoredJob[]>;
   listMatchedJobs(limit?: number): Promise<StoredJob[]>;
   close(): Promise<void>;
-  getJob?(externalId: string): Promise<StoredJob | undefined>;
 }
 
 export * from "./postgres-job-repository";

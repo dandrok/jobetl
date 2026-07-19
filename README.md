@@ -9,9 +9,9 @@ It discovers listings from supported sources, fetches each full offer descriptio
 Simple use case: you want a daily list of jobs worth reviewing instead of opening every offer by hand.
 
 - choose sources and filters
-- point the app at your CV in markdown
-- run the pipeline
-- review only the jobs that passed the match threshold
+- point the app at one or more profile match briefs (`cv.md`, `cv-ai.md`, …)
+- run the pipeline (all enabled profiles, or one with `--profile`)
+- review only the jobs that passed each profile’s match threshold
 
 ## Stack
 
@@ -43,7 +43,7 @@ Once we have a valid list of job URLs, we need the actual job descriptions.
 
 ### 3. Intelligence (DeepSeek V4)
 With the clean Markdown in hand, we evaluate the job.
-- **DeepSeek V4 (`deepseek-v4-flash`)** is used via the Vercel AI SDK to score the job descriptions against your personal `cv.md`. 
+- **DeepSeek V4 (`deepseek-v4-flash`)** is used via the Vercel AI SDK to score job descriptions against each profile’s match brief (`cv.md`, `cv-ai.md`, …). 
 - **Why DeepSeek?** DeepSeek V4 Flash provides high-level reasoning and matching intelligence at an extremely low price point. Its superior cost-to-performance ratio and fast response times make it ideal for bulk-scoring hundreds of job descriptions daily without excessive API costs.
 
 ### 4. Storage (PostgreSQL + Drizzle ORM)
@@ -114,11 +114,12 @@ Install dependencies:
 npm install
 ```
 
-Create your local env file and CV file:
+Create your local env file and CV / match-brief files:
 
 ```bash
 cp .env.example .env
 cp cv.example.md cv.md
+cp cv-ai.example.md cv-ai.md
 ```
 
 Then:
@@ -127,30 +128,36 @@ Then:
    ```env
    DATABASE_URL=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl
    ```
-2. Update `resumeMarkdownPath` in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts) to `./cv.md`.
-3. Adjust source filters, `matchThreshold`, and concurrency in [`src/config.ts`](/home/dandrok/git/jobetl/src/config.ts).
-4. Start your local database:
+2. Edit profiles in [`src/core/config.ts`](src/core/config.ts): each profile has `resumeMarkdownPath`, `matchThreshold`, `emailSubjectPrefix`, and per-source keywords.
+3. Customize `cv.md` (software) and `cv-ai.md` (AI hybrid brief — see `cv-ai.example.md`).
+4. Start your local database and apply migrations:
    ```bash
    npm run db:start
+   npm run db:migrate
    ```
 
 ## Run
 
-Run all enabled sources:
+Run all enabled profiles (software then ai by default), each with its sources:
 
 ```bash
 npm run dev
 ```
 
-Run a single source:
+Run a single profile and/or source:
 
 ```bash
+npm run dev -- --profile software
+npm run dev -- --profile ai
+npm run dev -- --profile ai --source justjoinit
 npm run dev -- --source justjoinit
 npm run dev -- --source nofluffjobs
 npm run dev -- --source bulldogjob
 npm run dev -- --source pracujpl
 npm run dev -- --source thesmartjobs
 ```
+
+Jobs are tagged with `profile` (`software` | `ai` | `both` | null for legacy). Each profile can send its own email alert via Resend using the same `RECIPIENT_EMAIL` and a profile-specific subject prefix.
 
 Review the best saved matches in the terminal:
 
@@ -196,6 +203,22 @@ In production, the application runs on a cloud instance with automated delivery:
 - **Hosting**: AWS EC2 instance running Ubuntu.
 - **Process Manager**: PM2 manages background tasks and supervises the API server using `ecosystem.config.cjs`.
 - **Database**: PostgreSQL runs in a containerized environment (via `docker-compose.yml`) with Docker persistent volumes preserving job records.
+- **Scheduling (Cron)**: Executed twice daily at 11:00 AM and 7:00 PM system local / UTC time via the host system's `crontab`. Because the logs redirect to a local file, configure `logrotate` to prevent unbounded disk usage:
+  ```text
+  0 11,19 * * * cd ~/jobetl && npm run dev >> ~/jobetl/cron.log 2>&1
+  ```
+  **Log Retention**: To prevent `cron.log` from growing indefinitely and causing disk exhaustion, configure a `logrotate` config file at `/etc/logrotate.d/jobetl`:
+  ```text
+  /home/ubuntu/jobetl/cron.log {
+      daily
+      rotate 7
+      compress
+      delaycompress
+      missingok
+      notifempty
+      copytruncate
+  }
+  ```
 - **Continuous Deployment**: Managed by GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)). Pushing to `master` initiates SSH connection to EC2, resets code, runs migrations, builds the bundle, and restarts the PM2 processes.
 
 ## Verify & Format
