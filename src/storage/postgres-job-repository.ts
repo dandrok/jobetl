@@ -6,6 +6,7 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { jobsTable } from "./schema";
 import type { JobRepository } from "./index";
 import type { JobListing, MatchCandidate, StoredJob } from "@core/types";
+import { mergeScoredJobState } from "@storage/profile-merge";
 
 function mapRow(row: typeof jobsTable.$inferSelect): StoredJob {
   return {
@@ -20,6 +21,7 @@ function mapRow(row: typeof jobsTable.$inferSelect): StoredJob {
     matchScore: row.matchScore ?? undefined,
     matchReason: row.matchReason ?? undefined,
     summary: row.summary ?? undefined,
+    profile: row.profile ?? null,
     status: row.status as StoredJob["status"],
     isApplied: row.isApplied,
     isNotInterested: row.isNotInterested,
@@ -59,6 +61,15 @@ export class PostgresJobRepository implements JobRepository {
       .where(eq(jobsTable.externalId, externalId))
       .limit(1);
     return rows[0]?.status as StoredJob["status"] | undefined;
+  }
+
+  async getJob(externalId: string): Promise<StoredJob | undefined> {
+    const rows = await this.db
+      .select()
+      .from(jobsTable)
+      .where(eq(jobsTable.externalId, externalId))
+      .limit(1);
+    return rows[0] ? mapRow(rows[0]) : undefined;
   }
 
   async markJobFetching(externalId: string): Promise<void> {
@@ -132,16 +143,28 @@ export class PostgresJobRepository implements JobRepository {
       .where(eq(jobsTable.externalId, externalId));
   }
 
-  async saveScoredJob(candidate: MatchCandidate): Promise<void> {
+  async saveScoredJob(candidate: MatchCandidate, profileId?: string): Promise<void> {
     const now = new Date().toISOString();
+    const existing = await this.getJob(candidate.job.externalId);
+    const merged = profileId
+      ? mergeScoredJobState(existing, candidate, profileId)
+      : {
+          profile: existing?.profile ?? null,
+          status: (candidate.match.shouldSave ? "matched" : "rejected") as "matched" | "rejected",
+          matchScore: candidate.match.score,
+          matchReason: candidate.match.reason,
+          summary: candidate.match.summary
+        };
+
     await this.db
       .update(jobsTable)
       .set({
         offerMarkdown: candidate.job.offerMarkdown,
-        matchScore: candidate.match.score,
-        matchReason: candidate.match.reason,
-        summary: candidate.match.summary,
-        status: candidate.match.shouldSave ? "matched" : "rejected",
+        matchScore: merged.matchScore,
+        matchReason: merged.matchReason,
+        summary: merged.summary,
+        profile: merged.profile,
+        status: merged.status,
         updatedAt: now
       })
       .where(eq(jobsTable.externalId, candidate.job.externalId));
@@ -159,6 +182,7 @@ export class PostgresJobRepository implements JobRepository {
       matchScore: job.matchScore ?? null,
       matchReason: job.matchReason ?? null,
       summary: job.summary ?? null,
+      profile: job.profile ?? null,
       status: job.status,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt

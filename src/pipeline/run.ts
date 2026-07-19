@@ -38,7 +38,7 @@ export interface PipelineRepository {
   saveFetchedOffer(externalId: string, offerMarkdown: string): Promise<void>;
   markJobScoring(externalId: string): Promise<void>;
   markJobError(externalId: string): Promise<void>;
-  saveScoredJob(candidate: MatchCandidate): Promise<void>;
+  saveScoredJob(candidate: MatchCandidate, profileId?: string): Promise<void>;
 }
 
 export interface PipelineDependencies {
@@ -322,7 +322,7 @@ export async function runPipeline(
             }
           };
 
-          await dependencies.repository.saveScoredJob(candidate);
+          await dependencies.repository.saveScoredJob(candidate, config.profileId);
           snapshot.scoring -= 1;
           activeScoreCompanies.delete(offer.externalId);
           if (candidate.match.shouldSave) {

@@ -14,6 +14,8 @@ export const jobsTable = pgTable(
     matchScore: real("match_score"),
     matchReason: text("match_reason"),
     summary: text("summary"),
+    /** Scoring lane: software | ai | both | null (legacy). */
+    profile: text("profile"),
     status: text("status").notNull(),
     isApplied: boolean("is_applied").notNull().default(false),
     isNotInterested: boolean("is_not_interested").notNull().default(false),

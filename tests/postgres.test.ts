@@ -234,7 +234,7 @@ describe("PostgresJobRepository", () => {
     };
 
     await repository.upsertDiscoveredJob(candidate.job);
-    await repository.saveScoredJob(candidate);
+    await repository.saveScoredJob(candidate, "software");
 
     const matches = await repository.listMatchedJobs();
 
@@ -242,10 +242,58 @@ describe("PostgresJobRepository", () => {
     expect(matches[0]).toMatchObject({
       externalId: "justjoinit:/job-offer/acme",
       status: "matched",
+      profile: "software",
       matchScore: 0.91,
       matchReason: "Strong overlap in Node.js, automation, and ETL.",
       summary: "Backend data platform role with strong Node.js fit."
     });
+  });
+
+  test("merges a second profile match into both", async () => {
+    const baseJob = {
+      externalId: "justjoinit:/job-offer/genai",
+      source: "justjoinit" as const,
+      url: "https://justjoin.it/job-offer/genai",
+      title: "Fullstack GenAI",
+      company: "Cap",
+      offerMarkdown: "# GenAI"
+    };
+
+    await repository.upsertDiscoveredJob(baseJob);
+    await repository.saveScoredJob(
+      {
+        job: baseJob,
+        match: {
+          score: 0.8,
+          reason: "software fit",
+          summary: "sw",
+          shouldSave: true
+        }
+      },
+      "software"
+    );
+    await repository.saveScoredJob(
+      {
+        job: baseJob,
+        match: {
+          score: 0.92,
+          reason: "ai fit",
+          summary: "ai",
+          shouldSave: true
+        }
+      },
+      "ai"
+    );
+
+    const jobs = await repository.listJobs();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toMatchObject({
+      status: "matched",
+      profile: "both",
+      matchScore: 0.92,
+      summary: "ai"
+    });
+    expect(jobs[0].matchReason).toContain("ai fit");
   });
 
   test("upserts fully hydrated jobs and preserves imported timestamps", async () => {

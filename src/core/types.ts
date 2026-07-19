@@ -79,6 +79,8 @@ export interface StoredJob {
   matchScore?: number;
   matchReason?: string;
   summary?: string;
+  /** Scoring lane: software | ai | both | null (legacy untagged). */
+  profile?: string | null;
   status: JobStatus;
   isApplied?: boolean;
   isNotInterested?: boolean;
