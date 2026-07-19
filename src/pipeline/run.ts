@@ -9,6 +9,7 @@ import { selectSources } from "@scrapers/select";
 import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
 import { PostgresJobRepository } from "@storage/postgres-job-repository";
 import { AsyncQueue } from "@pipeline/async-queue";
+import { shouldSkipJobForProfile } from "@pipeline/profile-skip";
 import type {
   JobListing,
   JobOffer,
@@ -17,7 +18,8 @@ import type {
   MatchCandidate,
   MatchResult,
   PipelineProgressSnapshot,
-  ProfileRunConfig
+  ProfileRunConfig,
+  StoredJob
 } from "@core/types";
 
 export interface RunSummary {
@@ -34,6 +36,7 @@ export interface RunSummary {
 export interface PipelineRepository {
   upsertDiscoveredJob(job: JobListing): Promise<void>;
   getJobStatus(externalId: string): Promise<JobStatus | undefined>;
+  getJob?(externalId: string): Promise<StoredJob | undefined>;
   markJobFetching(externalId: string): Promise<void>;
   saveFetchedOffer(externalId: string, offerMarkdown: string): Promise<void>;
   markJobScoring(externalId: string): Promise<void>;
@@ -221,8 +224,12 @@ export async function runPipeline(
       await Promise.all(
         batch.map(async (listing) => {
           await dependencies.repository.upsertDiscoveredJob(listing);
-          const currentStatus = await dependencies.repository.getJobStatus(listing.externalId);
-          if (currentStatus === "matched" || currentStatus === "rejected") {
+          const existing = dependencies.repository.getJob
+            ? await dependencies.repository.getJob(listing.externalId)
+            : undefined;
+          const currentStatus =
+            existing?.status ?? (await dependencies.repository.getJobStatus(listing.externalId));
+          if (shouldSkipJobForProfile(currentStatus, existing?.profile, config.profileId)) {
             summary.skipped += 1;
             snapshot.skipped += 1;
           } else {
@@ -257,13 +264,28 @@ export async function runPipeline(
         emitSnapshot("update");
 
         let queuedForScore = false;
+        let preserveTerminalStatus = false;
 
         try {
-          await dependencies.repository.markJobFetching(listing.externalId);
-          const offerMarkdown = await dependencies.fetchOfferMarkdown(listing.url);
-          await dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+          const existing = dependencies.repository.getJob
+            ? await dependencies.repository.getJob(listing.externalId)
+            : undefined;
+          const isTerminal = existing?.status === "matched" || existing?.status === "rejected";
+          preserveTerminalStatus = isTerminal;
+          // Avoid wiping a prior profile match with intermediate statuses during re-score.
+          if (!isTerminal) {
+            await dependencies.repository.markJobFetching(listing.externalId);
+          }
+          const cachedMarkdown = existing?.offerMarkdown?.trim();
+          const offerMarkdown =
+            cachedMarkdown && cachedMarkdown.length > 0
+              ? cachedMarkdown
+              : await dependencies.fetchOfferMarkdown(listing.url);
+          if (!cachedMarkdown) {
+            await dependencies.repository.saveFetchedOffer(listing.externalId, offerMarkdown);
+            summary.fetched += 1;
+          }
 
-          summary.fetched += 1;
           snapshot.fetching -= 1;
           activeFetchCompanies.delete(listing.externalId);
           snapshot.queuedScore += 1;
@@ -278,13 +300,15 @@ export async function runPipeline(
             activeFetchCompanies.delete(listing.externalId);
           }
 
-          try {
-            await dependencies.repository.markJobError(listing.externalId);
-          } catch (markError) {
-            console.error(
-              `\nFailed to mark job error for ${listing.company} (${listing.url}):`,
-              markError instanceof Error ? markError.message : String(markError)
-            );
+          if (!preserveTerminalStatus) {
+            try {
+              await dependencies.repository.markJobError(listing.externalId);
+            } catch (markError) {
+              console.error(
+                `\nFailed to mark job error for ${listing.company} (${listing.url}):`,
+                markError instanceof Error ? markError.message : String(markError)
+              );
+            }
           }
           summary.failed += 1;
           snapshot.failed += 1;
@@ -310,8 +334,17 @@ export async function runPipeline(
         activeScoreCompanies.set(offer.externalId, offer.company);
         emitSnapshot("update");
 
+        let preserveTerminalStatus = false;
         try {
-          await dependencies.repository.markJobScoring(offer.externalId);
+          const existingForScore = dependencies.repository.getJob
+            ? await dependencies.repository.getJob(offer.externalId)
+            : undefined;
+          const isTerminal =
+            existingForScore?.status === "matched" || existingForScore?.status === "rejected";
+          preserveTerminalStatus = isTerminal;
+          if (!isTerminal) {
+            await dependencies.repository.markJobScoring(offer.externalId);
+          }
           const resumeMarkdown = await getResumeMarkdown();
           const match = await dependencies.scoreOffer(offer, resumeMarkdown);
           const candidate: MatchCandidate = {
@@ -337,13 +370,15 @@ export async function runPipeline(
         } catch (error) {
           snapshot.scoring -= 1;
           activeScoreCompanies.delete(offer.externalId);
-          try {
-            await dependencies.repository.markJobError(offer.externalId);
-          } catch (markError) {
-            console.error(
-              `\nFailed to mark job error for ${offer.company} (${offer.url}):`,
-              markError instanceof Error ? markError.message : String(markError)
-            );
+          if (!preserveTerminalStatus) {
+            try {
+              await dependencies.repository.markJobError(offer.externalId);
+            } catch (markError) {
+              console.error(
+                `\nFailed to mark job error for ${offer.company} (${offer.url}):`,
+                markError instanceof Error ? markError.message : String(markError)
+              );
+            }
           }
           summary.failed += 1;
           snapshot.failed += 1;
