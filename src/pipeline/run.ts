@@ -264,9 +264,7 @@ export async function runPipeline(
         let preserveTerminalStatus = false;
 
         try {
-          const existing = dependencies.repository.getJob
-            ? await dependencies.repository.getJob(listing.externalId)
-            : undefined;
+          const existing = await dependencies.repository.getJob(listing.externalId);
           const isTerminal = existing?.status === "matched" || existing?.status === "rejected";
           preserveTerminalStatus = isTerminal;
           // Avoid wiping a prior profile match with intermediate statuses during re-score.
