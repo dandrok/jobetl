@@ -72,4 +72,7 @@ async function checkStats() {
   }
 }
 
-checkStats().catch(console.error);
+checkStats().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

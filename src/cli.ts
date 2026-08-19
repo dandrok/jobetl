@@ -3,6 +3,8 @@ import { config } from "@core/config";
 import { buildProfileRunConfig, listProfileIds, resolveProfilesToRun } from "@core/profiles";
 import { MultilineProgressReporter } from "@progress/multiline-progress-reporter";
 import { runPipeline, type RunSummary } from "@pipeline/run";
+import { createSourceAdapters } from "@scrapers/index";
+import { selectSources } from "@scrapers/select";
 import { loadNotionSyncEnv, loadRuntimeEnv } from "@core/env";
 import { sendNewsletter } from "@core/email";
 import { NotionDatabaseClient } from "@notion/client";
@@ -22,10 +24,27 @@ async function main(): Promise<void> {
     const progress = new MultilineProgressReporter();
     try {
       const options = parseCliOptions(scrapeArgs, listProfileIds(config));
+      const adapters = createSourceAdapters();
       // Profiles run one after another so merge/skip stay correct when the same job
       // appears in multiple lanes. Inside each profile, fetch/score stay concurrent.
       // Each profile may send its own Resend email (same recipient, different subject).
       const profileIds = resolveProfilesToRun(config, options.profile);
+      // Validate --source against every profile up front. Without this, a source
+      // enabled for one lane but disabled for another scrapes and emails the first
+      // lane, then aborts on the second.
+      if (options.source) {
+        for (const profileId of profileIds) {
+          try {
+            selectSources(buildProfileRunConfig(config, profileId), adapters, options.source);
+          } catch (error: unknown) {
+            const reason = error instanceof Error ? error.message : String(error);
+            throw new Error(
+              `Source "${options.source}" is unusable for profile "${profileId}": ${reason}`,
+              { cause: error }
+            );
+          }
+        }
+      }
       const summaries: Array<{ profileId: string } & RunSummary> = [];
 
       for (const profileId of profileIds) {

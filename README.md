@@ -203,7 +203,7 @@ In production, the application runs on a cloud instance with automated delivery:
 - **Hosting**: AWS EC2 instance running Ubuntu.
 - **Process Manager**: PM2 manages background tasks and supervises the API server using `ecosystem.config.cjs`.
 - **Database**: PostgreSQL runs in a containerized environment (via `docker-compose.yml`) with Docker persistent volumes preserving job records.
-- **Scheduling (Cron)**: Executed twice daily at 11:00 AM and 7:00 PM system local / UTC time via the host system's `crontab`. Because the logs redirect to a local file, configure `logrotate` to prevent unbounded disk usage:
+- **Scheduling (Cron)**: Executed twice daily at 11:00 and 19:00 in the host system's local timezone via the host's `crontab` (the EC2 instance is configured to UTC). Because the logs redirect to a local file, configure `logrotate` to prevent unbounded disk usage:
   ```text
   0 11,19 * * * cd ~/jobetl && npm run dev >> ~/jobetl/cron.log 2>&1
   ```

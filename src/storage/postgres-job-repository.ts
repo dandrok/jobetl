@@ -145,29 +145,40 @@ export class PostgresJobRepository implements JobRepository {
 
   async saveScoredJob(candidate: MatchCandidate, profileId?: string): Promise<void> {
     const now = new Date().toISOString();
-    const existing = await this.getJob(candidate.job.externalId);
-    const merged = profileId
-      ? mergeScoredJobState(existing, candidate, profileId)
-      : {
-          profile: existing?.profile ?? null,
-          status: (candidate.match.shouldSave ? "matched" : "rejected") as "matched" | "rejected",
-          matchScore: candidate.match.score,
-          matchReason: candidate.match.reason,
-          summary: candidate.match.summary
-        };
+    // Read-merge-write must be atomic: two profile lanes scoring the same job
+    // concurrently would otherwise each merge against a stale row and the later
+    // write would drop the earlier lane's result. FOR UPDATE serialises them.
+    await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(jobsTable)
+        .where(eq(jobsTable.externalId, candidate.job.externalId))
+        .limit(1)
+        .for("update");
+      const existing = rows[0] ? mapRow(rows[0]) : undefined;
+      const merged = profileId
+        ? mergeScoredJobState(existing, candidate, profileId)
+        : {
+            profile: existing?.profile ?? null,
+            status: (candidate.match.shouldSave ? "matched" : "rejected") as "matched" | "rejected",
+            matchScore: candidate.match.score,
+            matchReason: candidate.match.reason,
+            summary: candidate.match.summary
+          };
 
-    await this.db
-      .update(jobsTable)
-      .set({
-        offerMarkdown: candidate.job.offerMarkdown,
-        matchScore: merged.matchScore,
-        matchReason: merged.matchReason,
-        summary: merged.summary,
-        profile: merged.profile,
-        status: merged.status,
-        updatedAt: now
-      })
-      .where(eq(jobsTable.externalId, candidate.job.externalId));
+      await tx
+        .update(jobsTable)
+        .set({
+          offerMarkdown: candidate.job.offerMarkdown,
+          matchScore: merged.matchScore,
+          matchReason: merged.matchReason,
+          summary: merged.summary,
+          profile: merged.profile,
+          status: merged.status,
+          updatedAt: now
+        })
+        .where(eq(jobsTable.externalId, candidate.job.externalId));
+    });
   }
 
   async upsertStoredJob(job: StoredJob): Promise<void> {
