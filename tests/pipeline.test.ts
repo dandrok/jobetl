@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { formatPipelineProgressText } from "@progress/formatters";
 import { runPipeline, type PipelineDependencies, type PipelineRepository } from "@pipeline/run";
 import type { SourceAdapterMap } from "@scrapers/types";
+import { mergeScoredJobState } from "@storage/profile-merge";
 import type {
   JobListing,
   JobOffer,
@@ -13,7 +14,7 @@ import type {
   JobStatus,
   MatchResult,
   PipelineProgressSnapshot,
-  RunConfig,
+  ProfileRunConfig,
   StoredJob
 } from "@core/types";
 
@@ -37,17 +38,19 @@ function createTempDir(): string {
   return dir;
 }
 
-function createConfig(): RunConfig {
+function createConfig(): ProfileRunConfig {
   const dir = createTempDir();
   const resumeMarkdownPath = join(dir, "resume.md");
   writeFileSync(resumeMarkdownPath, "# Resume\n\nNode.js and ETL");
 
   return {
+    profileId: "software",
     databaseUrl: "postgres://localhost:5432/test",
     resumeMarkdownPath,
     matchThreshold: 0.75,
     fetchConcurrency: 1,
     scoreConcurrency: 1,
+    emailSubjectPrefix: "JobETL [software]",
     sources: {
       justjoinit: {
         enabled: true,
@@ -197,6 +200,10 @@ function createRepository(
       operations.push(`status:${externalId}`);
       return jobs.get(externalId)?.status;
     },
+    async getJob(externalId) {
+      operations.push(`get:${externalId}`);
+      return jobs.get(externalId);
+    },
     async markJobFetching(externalId) {
       operations.push(`fetching:${externalId}`);
       updateJob(externalId, { status: "fetching" });
@@ -213,8 +220,21 @@ function createRepository(
       operations.push(`error:${externalId}`);
       updateJob(externalId, { status: "error" });
     },
-    async saveScoredJob(candidate) {
-      operations.push(`scored:${candidate.job.externalId}`);
+    async saveScoredJob(candidate, profileId) {
+      operations.push(`scored:${candidate.job.externalId}:${profileId ?? "none"}`);
+      const existing = jobs.get(candidate.job.externalId);
+      if (profileId) {
+        const merged = mergeScoredJobState(existing, candidate, profileId);
+        updateJob(candidate.job.externalId, {
+          offerMarkdown: candidate.job.offerMarkdown,
+          matchScore: merged.matchScore,
+          matchReason: merged.matchReason,
+          summary: merged.summary,
+          profile: merged.profile,
+          status: merged.status
+        });
+        return;
+      }
       updateJob(candidate.job.externalId, {
         offerMarkdown: candidate.job.offerMarkdown,
         matchScore: candidate.match.score,
@@ -441,14 +461,14 @@ describe("runPipeline", () => {
     expect(fetchOfferMarkdown).toHaveBeenCalledWith(freshListing.url);
     expect(scoreOffer).toHaveBeenCalledTimes(1);
     expect(repository.operations).toContain(`upsert:${matchedListing.externalId}`);
-    expect(repository.operations).toContain(`status:${matchedListing.externalId}`);
+    expect(repository.operations).toContain(`get:${matchedListing.externalId}`);
     expect(repository.operations).not.toContain(`fetching:${matchedListing.externalId}`);
     expect(repository.operations).not.toContain(`scoring:${matchedListing.externalId}`);
     expect(repository.operations).toContain(`upsert:${rejectedListing.externalId}`);
-    expect(repository.operations).toContain(`status:${rejectedListing.externalId}`);
+    expect(repository.operations).toContain(`get:${rejectedListing.externalId}`);
     expect(repository.operations).not.toContain(`fetching:${rejectedListing.externalId}`);
     expect(repository.operations).not.toContain(`scoring:${rejectedListing.externalId}`);
-    expect(repository.operations).toContain(`scored:${freshListing.externalId}`);
+    expect(repository.operations).toContain(`scored:${freshListing.externalId}:software`);
   });
 
   test("does not load resume markdown when every discovered job is skipped", async () => {
@@ -477,6 +497,44 @@ describe("runPipeline", () => {
       matchedCandidates: expect.any(Array)
     });
     expect(loadResumeMarkdown).not.toHaveBeenCalled();
+  });
+
+  test("re-scores a job already matched by another profile and reuses cached offer markdown", async () => {
+    const softwareConfig = createConfig();
+    softwareConfig.profileId = "software";
+    const aiConfig = createConfig();
+    aiConfig.profileId = "ai";
+    aiConfig.resumeMarkdownPath = join(createTempDir(), "cv-ai.md");
+    writeFileSync(aiConfig.resumeMarkdownPath, "# AI brief\n");
+
+    const listing = createListing("cross-profile");
+    const repository = createRepository();
+    const fetchOfferMarkdown = vi.fn(async () => "# Full offer body");
+    const scoreOffer = vi.fn(async () => createMatchResult(0.9));
+
+    const softwareDeps = createDependencies(repository, [listing], {
+      fetchOfferMarkdown,
+      scoreOffer
+    });
+    await runPipeline(softwareConfig, undefined, softwareDeps);
+
+    expect(repository.jobs.get(listing.externalId)?.profile).toBe("software");
+    expect(fetchOfferMarkdown).toHaveBeenCalledTimes(1);
+
+    const aiScore = vi.fn(async () => createMatchResult(0.95));
+    const aiDeps = createDependencies(repository, [listing], {
+      fetchOfferMarkdown,
+      scoreOffer: aiScore
+    });
+    const aiSummary = await runPipeline(aiConfig, undefined, aiDeps);
+
+    expect(aiSummary.skipped).toBe(0);
+    expect(aiSummary.matched).toBe(1);
+    expect(aiScore).toHaveBeenCalledTimes(1);
+    // Cached markdown: no second network fetch
+    expect(fetchOfferMarkdown).toHaveBeenCalledTimes(1);
+    expect(repository.jobs.get(listing.externalId)?.profile).toBe("both");
+    expect(repository.jobs.get(listing.externalId)?.status).toBe("matched");
   });
 
   test("fails the run globally when resume markdown cannot be loaded for processable jobs", async () => {

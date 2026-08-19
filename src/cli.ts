@@ -1,7 +1,10 @@
 import { parseCliOptions } from "@core/cli-options";
 import { config } from "@core/config";
+import { buildProfileRunConfig, listProfileIds, resolveProfilesToRun } from "@core/profiles";
 import { MultilineProgressReporter } from "@progress/multiline-progress-reporter";
-import { runPipeline } from "@pipeline/run";
+import { runPipeline, type RunSummary } from "@pipeline/run";
+import { createSourceAdapters } from "@scrapers/index";
+import { selectSources } from "@scrapers/select";
 import { loadNotionSyncEnv, loadRuntimeEnv } from "@core/env";
 import { sendNewsletter } from "@core/email";
 import { NotionDatabaseClient } from "@notion/client";
@@ -20,16 +23,46 @@ async function main(): Promise<void> {
   if (command === "scrape") {
     const progress = new MultilineProgressReporter();
     try {
-      const options = parseCliOptions(scrapeArgs);
-      const summary = await runPipeline(config, progress, undefined, options);
-      progress.succeed(
-        `Done: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
-      );
-      if (summary.matchedCandidates.length > 0) {
-        const env = loadRuntimeEnv();
-        await sendNewsletter(summary.matchedCandidates, env);
+      const options = parseCliOptions(scrapeArgs, listProfileIds(config));
+      const adapters = createSourceAdapters();
+      // Profiles run one after another so merge/skip stay correct when the same job
+      // appears in multiple lanes. Inside each profile, fetch/score stay concurrent.
+      // Each profile may send its own Resend email (same recipient, different subject).
+      const profileIds = resolveProfilesToRun(config, options.profile);
+      // Validate --source against every profile up front. Without this, a source
+      // enabled for one lane but disabled for another scrapes and emails the first
+      // lane, then aborts on the second.
+      if (options.source) {
+        for (const profileId of profileIds) {
+          try {
+            selectSources(buildProfileRunConfig(config, profileId), adapters, options.source);
+          } catch (error: unknown) {
+            const reason = error instanceof Error ? error.message : String(error);
+            throw new Error(
+              `Source "${options.source}" is unusable for profile "${profileId}": ${reason}`,
+              { cause: error }
+            );
+          }
+        }
       }
-      console.log(JSON.stringify(summary, null, 2));
+      const summaries: Array<{ profileId: string } & RunSummary> = [];
+
+      for (const profileId of profileIds) {
+        const profileConfig = buildProfileRunConfig(config, profileId);
+        const summary = await runPipeline(profileConfig, progress, undefined, options);
+        progress.succeed(
+          `Done [${profileId}]: scanned=${summary.scanned} skipped=${summary.skipped} fetched=${summary.fetched} matched=${summary.matched} rejected=${summary.rejected} failed=${summary.failed} local-db-total=${summary.stored}`
+        );
+        if (summary.matchedCandidates.length > 0) {
+          const env = loadRuntimeEnv();
+          await sendNewsletter(summary.matchedCandidates, env, {
+            subjectPrefix: profileConfig.emailSubjectPrefix
+          });
+        }
+        summaries.push({ profileId, ...summary });
+      }
+
+      console.log(JSON.stringify(summaries.length === 1 ? summaries[0] : summaries, null, 2));
     } catch (e: unknown) {
       progress.fail(e instanceof Error ? e.message : String(e));
       process.exitCode = 1;
