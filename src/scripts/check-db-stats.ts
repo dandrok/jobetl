@@ -44,7 +44,9 @@ async function checkStats() {
       .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
       .slice(0, 10);
     for (const j of recentMatches) {
-      console.log(`[${j.createdAt?.slice(0, 10)}] [${j.source}] (${j.matchScore?.toFixed(2)}) ${j.title} @ ${j.company}`);
+      console.log(
+        `[${j.createdAt?.slice(0, 10)}] [${j.source}] (${j.matchScore?.toFixed(2)}) ${j.title} @ ${j.company}`
+      );
     }
 
     const rejectedJobs = allJobs.filter((j) => j.status === "rejected");
@@ -53,15 +55,18 @@ async function checkStats() {
       .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
       .slice(0, 5);
     for (const j of recentRejections) {
-      console.log(`[${j.createdAt?.slice(0, 10)}] [${j.source}] (${j.matchScore?.toFixed(2)}) ${j.title} - Reason: ${j.matchReason?.slice(0, 120)}`);
+      console.log(
+        `[${j.createdAt?.slice(0, 10)}] [${j.source}] (${j.matchScore?.toFixed(2)}) ${j.title} - Reason: ${j.matchReason?.slice(0, 120)}`
+      );
     }
 
     const errorJobs = allJobs.filter((j) => j.status === "error");
     console.log(`\n--- ERROR JOBS (Total: ${errorJobs.length}) ---`);
     for (const j of errorJobs.slice(0, 5)) {
-      console.log(`[${j.createdAt?.slice(0, 10)}] [${j.source}] ${j.title} @ ${j.company} - Error: ${j.matchReason}`);
+      console.log(
+        `[${j.createdAt?.slice(0, 10)}] [${j.source}] ${j.title} @ ${j.company} - Error: ${j.matchReason}`
+      );
     }
-
   } finally {
     await repo.close();
   }
