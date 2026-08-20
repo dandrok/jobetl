@@ -39,7 +39,15 @@ export async function handlePatchJob(
   if (!body.ok) return;
 
   const { isApplied, isNotInterested } = body.value;
-  if (typeof isApplied !== "boolean" && typeof isNotInterested !== "boolean") {
+
+  // Reject a supplied-but-wrongly-typed field rather than silently ignoring it,
+  // which would report success for an update that never happened.
+  const malformed = [isApplied, isNotInterested].some(
+    (value) => value !== undefined && typeof value !== "boolean"
+  );
+  const hasUpdate = typeof isApplied === "boolean" || typeof isNotInterested === "boolean";
+
+  if (malformed || !hasUpdate) {
     sendJson(res, 400, { error: "Bad Request" });
     return;
   }

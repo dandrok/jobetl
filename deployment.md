@@ -4,7 +4,7 @@ The dashboard is a static Svelte bundle plus a small JSON API. In production
 nginx terminates TLS, serves `ui/dist` directly, and proxies `/api/*` to the
 Node process on loopback. Node is never exposed to the internet.
 
-```
+```text
 browser ──HTTPS──▶ nginx ──HTTP──▶ 127.0.0.1:3001 (pm2: jobetl-api) ──▶ postgres
                      │
                      └── serves ui/dist directly
@@ -14,15 +14,39 @@ browser ──HTTPS──▶ nginx ──HTTP──▶ 127.0.0.1:3001 (pm2: jobe
 straight at EC2 avoids proxying through Netlify, which would add a second
 forwarding hop and make `X-Forwarded-For` partly attacker-controlled.
 
-## 1. DNS
+## 1. DNS (Cloudflare)
 
-Add an `A` record for `jobetl` on `thedotfile.com` pointing at the EC2 public IP.
-Netlify hosts the apex; this record is a sibling of it and does not affect it.
+`thedotfile.com` uses Cloudflare nameservers (`megan.ns.cloudflare.com`,
+`seamus.ns.cloudflare.com`), so the record goes in the **Cloudflare dashboard**,
+not Netlify. Netlify only serves the site itself: `www` is a CNAME to
+`thedotfile.netlify.app`. This record is a sibling and does not affect it.
 
-Confirm before continuing, or certbot will fail:
+In Cloudflare → DNS → Records → Add record:
+
+| Field | Value |
+|---|---|
+| Type | `A` |
+| Name | `jobetl` |
+| IPv4 address | the EC2 public IP (same host as the `EC2_HOST` GitHub secret) |
+| Proxy status | **DNS only (grey cloud)** |
+| TTL | Auto |
+
+**Proxy status must be grey, not orange.** With Cloudflare proxying enabled:
+
+- Cloudflare terminates TLS itself, so the Let's Encrypt cert on the box is not
+  what visitors see, and `certbot --nginx` renewals get more fragile.
+- nginx sees Cloudflare's IP as `$remote_addr`, so `X-Real-IP` becomes a
+  Cloudflare address and every visitor shares one login rate-limit bucket. The
+  real client IP would only be in `CF-Connecting-IP`, which this app does not
+  read.
+
+Grey cloud keeps exactly one trusted proxy hop (nginx), which is what the rate
+limiter is built for.
+
+Confirm it resolves before continuing, or certbot will fail:
 
 ```bash
-dig +short jobetl.thedotfile.com
+getent hosts jobetl.thedotfile.com
 ```
 
 ## 2. EC2 security group
@@ -59,7 +83,40 @@ the server logs a warning at boot if it detects one.
 sudo apt install nginx certbot python3-certbot-nginx
 ```
 
+### 4a. Bootstrap over HTTP first
+
+The hardened config below references certificate files that do not exist yet, so
+installing it first makes `nginx -t` fail. Start with a minimal HTTP-only block
+so certbot has a server to attach to.
+
 `/etc/nginx/sites-available/jobetl`:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name jobetl.thedotfile.com;
+    root /home/ubuntu/jobetl/ui/dist;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/jobetl /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d jobetl.thedotfile.com
+```
+
+Certbot obtains the certificate and rewrites this file to add a TLS server
+block. Certbot installs its own renewal timer; confirm with
+`systemctl list-timers | grep certbot`.
+
+### 4b. Replace with the hardened config
+
+Now that `/etc/letsencrypt/live/jobetl.thedotfile.com/` exists, replace the file
+with the full version — this is what actually adds the API proxy, the security
+headers and the login throttle:
 
 ```nginx
 # Login throttle. Defence in depth in front of the app's own per-IP limiter,
@@ -134,16 +191,12 @@ in `ecosystem.config.cjs`) is what makes it trust that header. Both are
 required: without the header every visitor shares one bucket, and without
 `TRUST_PROXY` the header is ignored.
 
-nginx must be able to traverse into the web root:
+nginx must be able to traverse into the web root, or static files 403:
 
 ```bash
 chmod o+x /home/ubuntu /home/ubuntu/jobetl /home/ubuntu/jobetl/ui
-sudo ln -s /etc/nginx/sites-available/jobetl /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d jobetl.thedotfile.com
 ```
-
-Certbot installs its own renewal timer; confirm with `systemctl list-timers | grep certbot`.
 
 ## 5. Deploy
 

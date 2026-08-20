@@ -86,7 +86,10 @@ export class PasswordVerifier {
   }
 }
 
-/** True when the stored digest was produced with heavier parameters than ARGON2_OPTIONS. */
+/**
+ * True when the stored digest's Argon2 version, memoryCost, timeCost or
+ * parallelism differ from ARGON2_OPTIONS in any direction.
+ */
 export function needsRehash(hash: string): boolean {
   try {
     return argon2.needsRehash(hash, ARGON2_OPTIONS);

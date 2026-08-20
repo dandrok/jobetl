@@ -8,6 +8,7 @@ import { RateLimiter } from "@server/rate-limit";
 import { needsRehash, PasswordVerifier } from "@server/auth/password";
 
 const GC_INTERVAL_MS = 60 * 60 * 1000;
+const SHUTDOWN_DRAIN_MS = 10_000;
 
 export function startServer() {
   // Throws on missing DASHBOARD_PASSWORD_HASH, so a misconfigured server fails
@@ -16,8 +17,9 @@ export function startServer() {
 
   if (needsRehash(env.passwordHash)) {
     console.warn(
-      "⚠️  DASHBOARD_PASSWORD_HASH uses non-standard Argon2 parameters. " +
-        "Regenerate it with `npm run hash:password` to reduce per-login memory use."
+      "⚠️  DASHBOARD_PASSWORD_HASH was created with different Argon2 parameters " +
+        "(version, memoryCost, timeCost or parallelism) than this build expects. " +
+        "Regenerate it with `npm run hash:password`."
     );
   }
 
@@ -50,10 +52,31 @@ export function startServer() {
     console.log(`✨ JobETL Backend API is running at http://${env.host}:${env.port}`);
   });
 
+  let shuttingDown = false;
+
   const shutdown = () => {
+    // PM2 reload can deliver a second signal; without this the first close is
+    // still in flight and the second immediately errors.
+    if (shuttingDown) return;
+    shuttingDown = true;
+
     console.log("\n🛑 Shutting down HTTP server gracefully...");
     clearInterval(gcInterval);
-    server.close(async (err) => {
+
+    // server.close() waits for keep-alive connections to go idle, which can
+    // outlast PM2's kill timeout and turn a reload into a SIGKILL.
+    const drainTimer = setTimeout(() => {
+      console.warn(`Connections still open after ${SHUTDOWN_DRAIN_MS}ms; closing them.`);
+      server.closeAllConnections();
+    }, SHUTDOWN_DRAIN_MS);
+
+    let finished = false;
+
+    const finish = async (err?: Error | null) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(drainTimer);
+
       let hasError = !!err;
       if (err) {
         console.error("Error shutting down server:", err);
@@ -66,7 +89,9 @@ export function startServer() {
         hasError = true;
       }
       process.exit(hasError ? 1 : 0);
-    });
+    };
+
+    server.close((err) => void finish(err));
   };
 
   process.on("SIGINT", shutdown);

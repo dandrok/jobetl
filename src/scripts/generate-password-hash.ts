@@ -5,6 +5,41 @@ const CTRL_C = String.fromCharCode(3);
 const CTRL_D = String.fromCharCode(4);
 const ERASE = new Set([String.fromCharCode(127), String.fromCharCode(8)]);
 
+// Input can arrive faster than it is consumed -- piped stdin delivers every
+// line in a single chunk -- so leftovers persist between prompts.
+let buffered = "";
+
+function applyErase(line: string): string {
+  let out = "";
+  for (const char of line) {
+    if (ERASE.has(char)) {
+      out = out.slice(0, -1);
+    } else {
+      out += char;
+    }
+  }
+  return out;
+}
+
+/** Pulls one complete line out of the buffer, or null if none has arrived yet. */
+function takeLine(): string | null {
+  let end = -1;
+  for (let i = 0; i < buffered.length; i += 1) {
+    const char = buffered[i];
+    if (char === "\n" || char === "\r" || char === CTRL_D) {
+      end = i;
+      break;
+    }
+  }
+  if (end === -1) return null;
+
+  const line = buffered.slice(0, end);
+  let next = end + 1;
+  if (buffered[end] === "\r" && buffered[next] === "\n") next += 1;
+  buffered = buffered.slice(next);
+  return applyErase(line);
+}
+
 /**
  * Prompts for a password without echoing it.
  *
@@ -15,50 +50,70 @@ function readPassword(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const input = process.stdin;
     const output = process.stdout;
-    let buffer = "";
+
+    output.write(prompt);
+
+    const ready = takeLine();
+    if (ready !== null) {
+      output.write("\n");
+      resolve(ready);
+      return;
+    }
 
     const cleanup = () => {
       input.off("data", onData);
+      input.off("end", onEnd);
       if (input.isTTY) input.setRawMode(false);
       input.pause();
       output.write("\n");
     };
 
     const onData = (chunk: string) => {
-      for (const char of chunk) {
-        if (char === "\n" || char === "\r" || char === CTRL_D) {
-          cleanup();
-          resolve(buffer);
-          return;
-        }
-        if (char === CTRL_C) {
-          cleanup();
-          reject(new Error("Aborted"));
-          return;
-        }
-        if (ERASE.has(char)) {
-          buffer = buffer.slice(0, -1);
-          continue;
-        }
-        buffer += char;
+      if (chunk.includes(CTRL_C)) {
+        cleanup();
+        reject(new Error("Aborted"));
+        return;
+      }
+      buffered += chunk;
+      const line = takeLine();
+      if (line !== null) {
+        cleanup();
+        resolve(line);
       }
     };
 
-    output.write(prompt);
+    // Input closed without a trailing newline.
+    const onEnd = () => {
+      const rest = applyErase(buffered);
+      buffered = "";
+      cleanup();
+      resolve(rest);
+    };
+
     // Raw mode stops the terminal echoing keystrokes; piped input has no TTY
     // and needs no suppression.
     if (input.isTTY) input.setRawMode(true);
     input.setEncoding("utf8");
     input.resume();
     input.on("data", onData);
+    input.on("end", onEnd);
   });
 }
 
 async function run() {
-  const password = (await readPassword("Dashboard password: ")).trim();
+  // Never trim: the login endpoint hashes exactly what the client sends, so
+  // normalising here would produce a digest the real password cannot match.
+  const password = await readPassword("Dashboard password: ");
 
   if (password.length < 12) {
     console.error("Password must be at least 12 characters.");
+    process.exit(1);
+  }
+
+  // Input is not echoed, so a typo would otherwise yield a hash for a password
+  // nobody knows.
+  if ((await readPassword("Confirm password:    ")) !== password) {
+    console.error("Passwords do not match.");
     process.exit(1);
   }
 

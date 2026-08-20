@@ -391,6 +391,44 @@ describe("job updates", () => {
     });
   });
 
+  it("rejects a malformed field rather than silently ignoring it", async () => {
+    let interestedCalls = 0;
+    const { deps } = buildDeps({
+      repository: fakeRepository({
+        updateJobInterestedStatus: async () => {
+          interestedCalls += 1;
+          return true;
+        }
+      })
+    });
+
+    await withServer(deps, async (base) => {
+      const cookie = cookieFrom(await login(base, PASSWORD));
+      // A valid isApplied alongside a bogus isNotInterested must not report
+      // success for a half-applied update.
+      const res = await fetch(`${base}/api/jobs/job-1`, {
+        method: "PATCH",
+        headers: { cookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ isApplied: true, isNotInterested: "yes" })
+      });
+      expect(res.status).toBe(400);
+      expect(interestedCalls).toBe(0);
+    });
+  });
+
+  it("accepts both fields when both are boolean", async () => {
+    const { deps } = buildDeps();
+    await withServer(deps, async (base) => {
+      const cookie = cookieFrom(await login(base, PASSWORD));
+      const res = await fetch(`${base}/api/jobs/job-1`, {
+        method: "PATCH",
+        headers: { cookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ isApplied: true, isNotInterested: false })
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
   it("requires a session", async () => {
     const { deps } = buildDeps();
     await withServer(deps, async (base) => {
@@ -473,10 +511,9 @@ describe("argon2 wiring", () => {
 
   it("verifies a real Argon2 digest end to end", async () => {
     const { deps } = buildDeps({
-      env: serverEnv({ passwordHash: "" }),
+      env: serverEnv({ passwordHash: hash }),
       passwordVerifier: new PasswordVerifier()
     });
-    deps.env = serverEnv({ passwordHash: hash });
 
     await withServer(deps, async (base) => {
       expect((await login(base, PASSWORD)).status).toBe(200);
