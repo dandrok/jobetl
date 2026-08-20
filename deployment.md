@@ -195,9 +195,18 @@ nginx runs as `www-data` and must be able to traverse into the web root, or
 static files 403. Grant that to the nginx user specifically with an ACL rather
 than `chmod o+x`, which would open the home directory to every local account:
 
-Chained with `&&` so a failed ACL never reaches the nginx reload. (Avoid
-`set -euo pipefail` here: pasted into an interactive SSH shell it persists, and
-the next command returning non-zero closes your session.)
+First make sure the web root actually exists. Step 5's deploy builds it, but on
+a first-time setup nginx is configured before that runs, and `setfacl` fails on
+a missing path. Do not substitute `mkdir -p`: an empty root satisfies the ACL
+command while leaving the site serving 404s.
+
+```bash
+cd ~/jobetl && npm run build:ui
+```
+
+Then apply the permissions. Chained with `&&` so a failed ACL never reaches the
+nginx reload. (Avoid `set -euo pipefail` here: pasted into an interactive SSH
+shell it persists, and the next command returning non-zero closes your session.)
 
 ```bash
 sudo apt install -y acl &&
