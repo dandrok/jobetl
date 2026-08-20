@@ -53,6 +53,10 @@ getent hosts jobetl.thedotfile.com
 
 Inbound should be **80, 443, and 22 only** — ideally 22 restricted to your own IP.
 
+Do this **before** step 4: Let's Encrypt validates over HTTP-01, which it serves
+on **port 80** and will not follow to another port. With 80 closed, `certbot`
+fails and there is no certificate for the TLS block to reference.
+
 Explicitly verify **3001 and 5432 are closed**. `.env` used to point at
 `13.60.24.63:5432`, so Postgres may still have a public ingress rule. From a
 machine outside AWS:
