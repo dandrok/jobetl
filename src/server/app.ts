@@ -9,10 +9,7 @@ import { handleLogin, handleLogout } from "@server/routes/auth";
 import { handleListJobs, handlePatchJob } from "@server/routes/jobs";
 
 /** Only the repository methods the dashboard actually needs, so tests can fake it cheaply. */
-export type DashboardRepository = Pick<
-  JobRepository,
-  "listJobs" | "updateJobAppliedStatus" | "updateJobInterestedStatus"
->;
+export type DashboardRepository = Pick<JobRepository, "listJobs" | "updateJobStatusFlags">;
 
 export interface AppDeps {
   env: ServerEnv;

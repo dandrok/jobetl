@@ -97,3 +97,20 @@ export function needsRehash(hash: string): boolean {
     return false;
   }
 }
+
+const PHC_PATTERN = /^\$(argon2(?:id|i|d))\$v=(\d+)\$m=(\d+),t=(\d+),p=(\d+)/;
+
+/** Renders the parameters encoded in a digest, for actionable startup warnings. */
+export function describeHashParams(hash: string): string {
+  const match = PHC_PATTERN.exec(hash);
+  if (!match) return "unrecognised digest format";
+
+  const [, type, version, memoryCost, timeCost, parallelism] = match;
+  return `${type} v=${version} m=${memoryCost} t=${timeCost} p=${parallelism}`;
+}
+
+/** Renders ARGON2_OPTIONS in the same shape, for comparison. */
+export function describeExpectedParams(): string {
+  const { memoryCost, timeCost, parallelism } = ARGON2_OPTIONS;
+  return `argon2id v=19 m=${memoryCost} t=${timeCost} p=${parallelism}`;
+}

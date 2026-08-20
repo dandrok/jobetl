@@ -5,6 +5,9 @@
   "license": "ISC",
   "author": "dandrok",
   "type": "module",
+  "engines": {
+    "node": ">=18.2"
+  },
   "main": "dist/cli.js",
   "scripts": {
     "build": "tsup src/cli.ts --format esm --dts --clean",

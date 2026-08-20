@@ -63,8 +63,9 @@ export class SessionStore {
   }
 
   cookie(id: string, isProduction: boolean): string {
-    // Max-Age is delta-seconds and must be an integer.
-    return this.buildCookie(id, Math.floor(this.expiryMs / 1000), isProduction);
+    // Max-Age is delta-seconds and must be an integer. Round up so a
+    // sub-second lifetime never becomes Max-Age=0 (expire immediately).
+    return this.buildCookie(id, Math.ceil(this.expiryMs / 1000), isProduction);
   }
 
   clearedCookie(isProduction: boolean): string {

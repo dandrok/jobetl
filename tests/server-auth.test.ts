@@ -20,8 +20,7 @@ const JOBS = [
 function fakeRepository(overrides: Partial<DashboardRepository> = {}): DashboardRepository {
   return {
     listJobs: async () => JOBS,
-    updateJobAppliedStatus: async (id) => id === "job-1",
-    updateJobInterestedStatus: async (id) => id === "job-1",
+    updateJobStatusFlags: async (id) => id === "job-1",
     ...overrides
   };
 }
@@ -392,11 +391,11 @@ describe("job updates", () => {
   });
 
   it("rejects a malformed field rather than silently ignoring it", async () => {
-    let interestedCalls = 0;
+    let writes = 0;
     const { deps } = buildDeps({
       repository: fakeRepository({
-        updateJobInterestedStatus: async () => {
-          interestedCalls += 1;
+        updateJobStatusFlags: async () => {
+          writes += 1;
           return true;
         }
       })
@@ -412,12 +411,21 @@ describe("job updates", () => {
         body: JSON.stringify({ isApplied: true, isNotInterested: "yes" })
       });
       expect(res.status).toBe(400);
-      expect(interestedCalls).toBe(0);
+      expect(writes).toBe(0);
     });
   });
 
-  it("accepts both fields when both are boolean", async () => {
-    const { deps } = buildDeps();
+  it("writes both fields in a single call so they cannot half-commit", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { deps } = buildDeps({
+      repository: fakeRepository({
+        updateJobStatusFlags: async (_id, flags) => {
+          calls.push(flags);
+          return true;
+        }
+      })
+    });
+
     await withServer(deps, async (base) => {
       const cookie = cookieFrom(await login(base, PASSWORD));
       const res = await fetch(`${base}/api/jobs/job-1`, {
@@ -426,6 +434,29 @@ describe("job updates", () => {
         body: JSON.stringify({ isApplied: true, isNotInterested: false })
       });
       expect(res.status).toBe(200);
+      expect(calls).toEqual([{ isApplied: true, isNotInterested: false }]);
+    });
+  });
+
+  it("passes through only the field that was supplied", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { deps } = buildDeps({
+      repository: fakeRepository({
+        updateJobStatusFlags: async (_id, flags) => {
+          calls.push(flags);
+          return true;
+        }
+      })
+    });
+
+    await withServer(deps, async (base) => {
+      const cookie = cookieFrom(await login(base, PASSWORD));
+      await fetch(`${base}/api/jobs/job-1`, {
+        method: "PATCH",
+        headers: { cookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ isNotInterested: true })
+      });
+      expect(calls).toEqual([{ isNotInterested: true }]);
     });
   });
 

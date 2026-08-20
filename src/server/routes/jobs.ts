@@ -53,13 +53,11 @@ export async function handlePatchJob(
   }
 
   try {
-    let updated = false;
-    if (typeof isApplied === "boolean") {
-      updated = (await deps.repository.updateJobAppliedStatus(id, isApplied)) || updated;
-    }
-    if (typeof isNotInterested === "boolean") {
-      updated = (await deps.repository.updateJobInterestedStatus(id, isNotInterested)) || updated;
-    }
+    // One statement, so a two-field update cannot half-commit.
+    const updated = await deps.repository.updateJobStatusFlags(id, {
+      ...(typeof isApplied === "boolean" ? { isApplied } : {}),
+      ...(typeof isNotInterested === "boolean" ? { isNotInterested } : {})
+    });
 
     if (updated) {
       sendJson(res, 200, { success: true });

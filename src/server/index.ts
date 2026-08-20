@@ -5,7 +5,12 @@ import { PostgresJobRepository } from "@storage/postgres-job-repository";
 import { createApp } from "@server/app";
 import { SessionStore } from "@server/sessions";
 import { RateLimiter } from "@server/rate-limit";
-import { needsRehash, PasswordVerifier } from "@server/auth/password";
+import {
+  describeExpectedParams,
+  describeHashParams,
+  needsRehash,
+  PasswordVerifier
+} from "@server/auth/password";
 
 const GC_INTERVAL_MS = 60 * 60 * 1000;
 const SHUTDOWN_DRAIN_MS = 10_000;
@@ -16,10 +21,15 @@ export function startServer() {
   const env = loadServerEnv();
 
   if (needsRehash(env.passwordHash)) {
+    // Deliberately a warning, not a hard failure: needsRehash also fires for
+    // parameters *stronger* than expected, and refusing to boot would take the
+    // dashboard down rather than degrade it.
     console.warn(
-      "⚠️  DASHBOARD_PASSWORD_HASH was created with different Argon2 parameters " +
-        "(version, memoryCost, timeCost or parallelism) than this build expects. " +
-        "Regenerate it with `npm run hash:password`."
+      "⚠️  DASHBOARD_PASSWORD_HASH parameters differ from this build's defaults.\n" +
+        `    stored:   ${describeHashParams(env.passwordHash)}\n` +
+        `    expected: ${describeExpectedParams()}\n` +
+        "    Regenerate with `npm run hash:password` unless this is intentional. " +
+        "A higher m multiplies per-login memory use (peak = UV_THREADPOOL_SIZE x m)."
     );
   }
 

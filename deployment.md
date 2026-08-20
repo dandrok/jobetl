@@ -191,12 +191,31 @@ in `ecosystem.config.cjs`) is what makes it trust that header. Both are
 required: without the header every visitor shares one bucket, and without
 `TRUST_PROXY` the header is ignored.
 
-nginx must be able to traverse into the web root, or static files 403:
+nginx runs as `www-data` and must be able to traverse into the web root, or
+static files 403. Grant that to the nginx user specifically with an ACL rather
+than `chmod o+x`, which would open the home directory to every local account:
 
 ```bash
-chmod o+x /home/ubuntu /home/ubuntu/jobetl /home/ubuntu/jobetl/ui
+sudo apt install -y acl
+
+# Traverse-only (x, not r) down to the checkout.
+sudo setfacl -m u:www-data:x /home/ubuntu /home/ubuntu/jobetl
+
+# Read access to the built bundle, plus a default ACL so files created by the
+# next `npm run build:ui` inherit it -- without -d, deploys silently start 403ing.
+sudo setfacl -R -m u:www-data:rX /home/ubuntu/jobetl/ui
+sudo setfacl -R -d -m u:www-data:rX /home/ubuntu/jobetl/ui
+
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+Confirm the account name first if the distro differs — `ps -o user= -C nginx`
+lists the worker user. Verify the result with `sudo -u www-data stat
+/home/ubuntu/jobetl/ui/dist/index.html`.
+
+If you would rather keep the home directory entirely closed, the alternative is
+to publish the bundle outside it — `rsync ui/dist/ /var/www/jobetl/` as a deploy
+step, with `root /var/www/jobetl;` in the vhost.
 
 ## 5. Deploy
 
