@@ -51,7 +51,16 @@ getent hosts jobetl.thedotfile.com
 
 ## 2. EC2 security group
 
-Inbound should be **80, 443, and 22 only** — ideally 22 restricted to your own IP.
+Inbound should be **80, 443, and 22 only**.
+
+Do **not** restrict 22 to your own IP: `deploy.yml` connects over SSH from
+GitHub-hosted runners, whose addresses rotate across a large published range, so
+a narrow source CIDR breaks continuous deployment. What protects port 22 here is
+key-only authentication — confirm it on the box with:
+
+```bash
+sudo sshd -T | grep -E 'passwordauthentication|permitrootlogin'   # both: no
+```
 
 Do this **before** step 4: Let's Encrypt validates over HTTP-01, which it serves
 on **port 80** and will not follow to another port. With 80 closed, `certbot`
@@ -227,6 +236,11 @@ sudo apt install -y acl &&
   sudo nginx -t &&
   sudo systemctl reload nginx
 ```
+
+If `nginx -t` fails with *"Address family not supported by protocol"*, the host
+has IPv6 disabled at the kernel level — drop the two `listen [::]:...` lines. The
+Cloudflare record above is IPv4-only (`A`, not `AAAA`), so nothing reaches the
+box over IPv6 either way, and the security group needs no `::/0` entry.
 
 Confirm the account name first if the distro differs — `ps -o user= -C nginx`
 lists the worker user. Verify the result with `sudo -u www-data stat
