@@ -195,18 +195,24 @@ nginx runs as `www-data` and must be able to traverse into the web root, or
 static files 403. Grant that to the nginx user specifically with an ACL rather
 than `chmod o+x`, which would open the home directory to every local account:
 
+Chained with `&&` so a failed ACL never reaches the nginx reload. (Avoid
+`set -euo pipefail` here: pasted into an interactive SSH shell it persists, and
+the next command returning non-zero closes your session.)
+
 ```bash
-sudo apt install -y acl
-
-# Traverse-only (x, not r) down to the checkout.
-sudo setfacl -m u:www-data:x /home/ubuntu /home/ubuntu/jobetl
-
-# Read access to the built bundle, plus a default ACL so files created by the
-# next `npm run build:ui` inherit it -- without -d, deploys silently start 403ing.
-sudo setfacl -R -m u:www-data:rX /home/ubuntu/jobetl/ui
-sudo setfacl -R -d -m u:www-data:rX /home/ubuntu/jobetl/ui
-
-sudo nginx -t && sudo systemctl reload nginx
+sudo apt install -y acl &&
+  # Traverse only (x, not r) down to the web root. www-data must walk the path
+  # but has no business reading App.svelte, components/ or tsconfig.json.
+  sudo setfacl -m u:www-data:x \
+    /home/ubuntu /home/ubuntu/jobetl /home/ubuntu/jobetl/ui &&
+  # Read access to the published bundle only.
+  sudo setfacl -R -m u:www-data:rX /home/ubuntu/jobetl/ui/dist &&
+  # Default ACL so files written by the next `npm run build:ui` inherit it.
+  # Vite empties dist rather than replacing it (the directory keeps its inode),
+  # so this survives deploys and does not need reapplying.
+  sudo setfacl -R -d -m u:www-data:rX /home/ubuntu/jobetl/ui/dist &&
+  sudo nginx -t &&
+  sudo systemctl reload nginx
 ```
 
 Confirm the account name first if the distro differs — `ps -o user= -C nginx`
