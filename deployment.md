@@ -146,9 +146,11 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    # `listen ... http2` is the portable form. The standalone `http2 on;`
+    # directive only exists from nginx 1.25.1; Ubuntu 24.04 ships 1.24 and
+    # rejects it with `unknown directive "http2"`. Check with `nginx -v`.
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name jobetl.thedotfile.com;
 
     ssl_certificate     /etc/letsencrypt/live/jobetl.thedotfile.com/fullchain.pem;
