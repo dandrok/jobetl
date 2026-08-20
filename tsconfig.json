@@ -9,6 +9,7 @@
     "ignoreDeprecations": "6.0",
     "paths": {
       "@core/*": ["src/core/*"],
+      "@server/*": ["src/server/*"],
       "@scrapers/*": ["src/scrapers/*"],
       "@matching/*": ["src/matching/*"],
       "@notion/*": ["src/notion/*"],

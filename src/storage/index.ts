@@ -1,5 +1,10 @@
 import type { JobListing, MatchCandidate, StoredJob } from "@core/types";
 
+export interface JobStatusFlags {
+  isApplied?: boolean;
+  isNotInterested?: boolean;
+}
+
 export interface JobRepository {
   hasExternalId(externalId: string): Promise<boolean>;
   getJobStatus(externalId: string): Promise<StoredJob["status"] | undefined>;
@@ -13,6 +18,8 @@ export interface JobRepository {
   upsertStoredJob(job: StoredJob): Promise<void>;
   updateJobAppliedStatus(externalId: string, isApplied: boolean): Promise<boolean>;
   updateJobInterestedStatus(externalId: string, isNotInterested: boolean): Promise<boolean>;
+  /** Applies both dashboard status flags in one statement so they cannot partially commit. */
+  updateJobStatusFlags(externalId: string, flags: JobStatusFlags): Promise<boolean>;
   listJobs(): Promise<StoredJob[]>;
   listMatchedJobs(limit?: number): Promise<StoredJob[]>;
   close(): Promise<void>;

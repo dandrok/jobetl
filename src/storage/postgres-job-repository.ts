@@ -4,7 +4,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 import { jobsTable } from "./schema";
-import type { JobRepository } from "./index";
+import type { JobRepository, JobStatusFlags } from "./index";
 import type { JobListing, MatchCandidate, StoredJob } from "@core/types";
 import { mergeScoredJobState } from "@storage/profile-merge";
 
@@ -228,21 +228,33 @@ export class PostgresJobRepository implements JobRepository {
   }
 
   async updateJobAppliedStatus(externalId: string, isApplied: boolean): Promise<boolean> {
-    const now = new Date().toISOString();
-    const appliedAt = isApplied ? now : null;
-    const result = await this.db
-      .update(jobsTable)
-      .set({ isApplied, appliedAt, updatedAt: now })
-      .where(eq(jobsTable.externalId, externalId))
-      .returning({ externalId: jobsTable.externalId });
-    return result.length > 0;
+    return this.updateJobStatusFlags(externalId, { isApplied });
   }
 
   async updateJobInterestedStatus(externalId: string, isNotInterested: boolean): Promise<boolean> {
+    return this.updateJobStatusFlags(externalId, { isNotInterested });
+  }
+
+  /**
+   * Writes both dashboard flags in a single UPDATE. Issuing one statement per
+   * field lets the first commit and the second fail, leaving the row half
+   * updated behind an error response.
+   */
+  async updateJobStatusFlags(externalId: string, flags: JobStatusFlags): Promise<boolean> {
     const now = new Date().toISOString();
+    const set: Partial<typeof jobsTable.$inferInsert> = { updatedAt: now };
+
+    if (flags.isApplied !== undefined) {
+      set.isApplied = flags.isApplied;
+      set.appliedAt = flags.isApplied ? now : null;
+    }
+    if (flags.isNotInterested !== undefined) {
+      set.isNotInterested = flags.isNotInterested;
+    }
+
     const result = await this.db
       .update(jobsTable)
-      .set({ isNotInterested, updatedAt: now })
+      .set(set)
       .where(eq(jobsTable.externalId, externalId))
       .returning({ externalId: jobsTable.externalId });
     return result.length > 0;

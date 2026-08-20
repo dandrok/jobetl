@@ -168,8 +168,17 @@ npm run report
 Launch the interactive Svelte Web Dashboard:
 
 ```bash
-npm run dev:ui
+npm run dashboard   # API on :3001 + Vite UI on :3000
 ```
+
+The dashboard is password-protected. Generate the hash before first use:
+
+```bash
+npm run hash:password   # prompts without echoing, prints a DASHBOARD_PASSWORD_HASH line for .env
+```
+
+The server refuses to start if `DASHBOARD_PASSWORD_HASH` is unset, so a
+misconfigured deployment fails loudly instead of serving a login nobody can pass.
 
 ### Dashboard Features
 
@@ -219,7 +228,8 @@ In production, the application runs on a cloud instance with automated delivery:
       copytruncate
   }
   ```
-- **Continuous Deployment**: Managed by GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)). Pushing to `master` initiates SSH connection to EC2, resets code, runs migrations, builds the bundle, and restarts the PM2 processes.
+- **Continuous Deployment**: Managed by GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)). Pushing to `master` initiates SSH connection to EC2, resets code, runs migrations, builds both the backend and the UI bundle, and restarts the PM2 processes.
+- **Public dashboard**: served at `https://jobetl.thedotfile.com` with nginx terminating TLS, serving `ui/dist` and proxying `/api/*` to the Node process on loopback. Full setup — DNS, certbot, the nginx vhost, security headers and the login throttle — is in [deployment.md](deployment.md).
 
 ## Verify & Format
 

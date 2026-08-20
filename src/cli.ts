@@ -12,7 +12,7 @@ import { NotionSyncProgressReporter } from "@notion/progress-reporter";
 import { syncJobsToNotion } from "@notion/sync";
 import { importJobsFromNotion } from "@notion/import";
 import { PostgresJobRepository } from "@storage/postgres-job-repository";
-import { startServer } from "./server";
+import { startServer } from "@server/index";
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);

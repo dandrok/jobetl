@@ -190,3 +190,12 @@ export interface NotionSyncEnv {
   notionToken: string;
   notionDatabaseId: string;
 }
+
+export interface ServerEnv {
+  passwordHash: string;
+  port: number;
+  host: string;
+  isProduction: boolean;
+  trustProxy: boolean;
+  corsAllowedOrigin: string;
+}
