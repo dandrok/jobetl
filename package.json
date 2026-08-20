@@ -10,6 +10,7 @@
     "build": "tsup src/cli.ts --format esm --dts --clean",
     "dev": "tsx src/cli.ts scrape",
     "test:email": "tsx src/scripts/test-email.ts",
+    "hash:password": "tsx src/scripts/generate-password-hash.ts",
     "test:scrapers": "tsx src/scripts/test-scrapers.ts",
     "dev:ui": "vite",
     "build:ui": "vite build",

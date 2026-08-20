@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@core': path.resolve(__dirname, './src/core'),
+      '@server': path.resolve(__dirname, './src/server'),
       '@scrapers': path.resolve(__dirname, './src/scrapers'),
       '@matching': path.resolve(__dirname, './src/matching'),
       '@notion': path.resolve(__dirname, './src/notion'),
