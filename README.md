@@ -1,59 +1,52 @@
 # JobETL
 
-JobETL helps you turn job boards into a short list of jobs that actually fit your CV.
+JobETL automates the ingestion, filtering, and scoring of software engineering job postings against candidate profile briefs.
 
-It discovers listings from supported sources, fetches each full offer description (using Jina Reader with a local Cheerio HTML-to-text fallback), scores it against your resume with AI, and stores the result in a local PostgreSQL database. Optional Notion sync lets the same data flow through GitHub Actions.
+The pipeline discovers listings from supported job boards, extracts full offer descriptions (using Jina Reader with an automated Cheerio HTML-to-text fallback), scores each role using DeepSeek V4, and stores deduplicated results in PostgreSQL via **Drizzle ORM**. Alerts are dispatched through Resend as a unified digest with real-time scraper health telemetry, with optional bi-directional synchronization to Notion.
 
 ## The Idea In 30 Seconds
 
-Simple use case: you want a daily list of jobs worth reviewing instead of opening every offer by hand.
-
-- choose sources and filters
-- point the app at one or more profile match briefs (`cv.md`, `cv-ai.md`, …)
-- run the pipeline (all enabled profiles, or one with `--profile`)
-- review only the jobs that passed each profile’s match threshold
+- Select job boards and query filters.
+- Define one or more profile match briefs (`cv.md`, `cv-ai.md`, ...).
+- Execute the pipeline across all enabled profiles or target a specific lane with `--profile`.
+- Review candidates exceeding the matching threshold in the terminal, via email digests, or through the web dashboard.
 
 ## Stack
 
-- Runtime: Node.js + TypeScript
-- Sources: `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`, `thesmartjobs.com`
-- Full-offer extraction: Jina Reader (with local Cheerio HTML-to-text fallback)
-- AI matching: DeepSeek `deepseek-v4-flash` via the AI SDK
-- Storage: local PostgreSQL database managed via **Drizzle ORM**
-- UI: Svelte 5 + Vite
-- Optional sync: Notion
-- Automation: GitHub Actions
-
-Current code uses DeepSeek for scoring. No OpenAI key is required.
-
-## How It Works (The Architecture)
-
-JobETL is designed to be fast, resilient, and cheap to run. Instead of building monolithic, brittle scrapers for every job board, the pipeline is split into four distinct layers:
-
-### 1. Discovery & Validation (Cheerio + Zod)
-First, the pipeline discovers job links fast.
-- **Cheerio** rapidly downloads and parses HTML search result pages. It is extremely fast and lightweight.
-- **Zod** acts as a structural firewall. Because job boards frequently change their DOM (HTML structure), scrapers break often. Every extracted job listing is immediately validated against a strict Zod schema (`JobListingSchema`). If a board changes its layout and the scraper misses a title or company, Zod catches it instantly and logs it to the Telemetry system instead of silently corrupting the database.
-
-### 2. Deep Extraction (Jina Reader & Cheerio Fallback)
-Once a valid list of job URLs is collected, the pipeline extracts full descriptions.
-- **Jina Reader API** (`https://r.jina.ai/`) acts as a universal extractor.
-- **Why Jina?** It visits the URL, bypasses anti-bot protections, strips noisy HTML (ads, navbars, modals), and returns pure Markdown. This avoids maintaining separate browser automation scripts for every source.
-- **Cheerio Fallback:** If Jina Reader is rate-limited (HTTP 429), out of credits (HTTP 402), or unreachable, the pipeline automatically falls back to fetching the page directly and using a local Cheerio parser to strip layouts/scripts and extract clean text. This provides an automated, free backup mechanism.
-
-### 3. Intelligence (DeepSeek V4)
-With clean Markdown extracted, the pipeline evaluates the offer.
-- **DeepSeek V4 (`deepseek-v4-flash`)** scores descriptions against each profile’s match brief (`cv.md`, `cv-ai.md`, …) via the Vercel AI SDK.
-- **Why DeepSeek?** DeepSeek V4 Flash provides strong reasoning and matching precision at low cost, making it feasible to score hundreds of offers daily.
-
-### 4. Storage (PostgreSQL + Drizzle ORM)
-All results are stored in a containerized database to prevent re-processing identical offers in subsequent runs.
-- **PostgreSQL** runs inside a local Docker container (configured via Docker Compose with persistent named volumes).
-- **Drizzle ORM** manages the schema and queries with strict TypeScript safety, eliminating SQL runtime bugs and keeping queries maintainable.
+- **Runtime:** Node.js + TypeScript
+- **Job Sources:** `justjoin.it`, `nofluffjobs`, `bulldogjob`, `pracuj.pl`, `thesmartjobs.com`
+- **Full-Offer Extraction:** Jina Reader API (with automated local Cheerio HTML-to-text fallback)
+- **AI Matching:** DeepSeek V4 (`deepseek-v4-flash`) via the Vercel AI SDK
+- **Storage:** Containerized PostgreSQL managed with **Drizzle ORM**
+- **Dashboard:** Svelte 5 + Vite (behind an authenticated Node.js API with Argon2 verification)
+- **Alerts:** Resend Email API (consolidated multi-profile digests + scraper health telemetry)
+- **Automation:** GitHub Actions (CI & CD) + host-level cron scheduling
 
 ---
 
-## The Pipeline Flow
+## Architecture & Data Flow
+
+The pipeline uses a decoupled, four-tier architecture designed for speed, resilience, and minimal operating costs:
+
+### 1. Discovery & Validation (Cheerio + Zod)
+- **Cheerio** downloads and parses HTML search result pages rapidly without the memory overhead of headless browsers.
+- **Zod** acts as a structural firewall (`JobListingSchema`). Job boards frequently alter DOM selectors; any missing field (title, company, URL) is trapped immediately and logged to the Telemetry monitor rather than propagating corrupted records into storage.
+
+### 2. Deep Extraction (Jina Reader & Cheerio Fallback)
+- **Jina Reader API** (`https://r.jina.ai/`) acts as the primary extractor, resolving target pages, stripping navbars, modals, and tracking scripts, and returning clean Markdown.
+- **Cheerio Fallback:** If Jina Reader is rate-limited (HTTP 429), out of credits (HTTP 402), or unreachable, the pipeline automatically fetches raw HTML directly and strips markup locally. This ensures continuous, zero-cost operational resilience.
+
+### 3. Intelligence & Scoring (DeepSeek V4)
+- **DeepSeek V4 Flash** evaluates extracted markdown descriptions against profile CV briefs (`cv.md`, `cv-ai.md`, ...).
+- DeepSeek provides high reasoning accuracy at minimal token cost, allowing high-throughput candidate evaluation without excessive API overhead.
+
+### 4. Storage & State Management (PostgreSQL + Drizzle ORM)
+- **PostgreSQL** runs in a Docker container with persistent named volumes to maintain data across container lifecycles. Deduplication is handled at the application and schema layer by checking job URLs and source IDs against existing records, preventing duplicate processing across subsequent runs.
+- **Drizzle ORM** enforces compile-time TypeScript schema safety across queries and migrations, significantly reducing SQL type mismatches and syntax errors.
+
+---
+
+## Pipeline Flow
 
 ```mermaid
 flowchart TD
@@ -65,167 +58,137 @@ flowchart TD
     end
 
     subgraph Extraction [2. Extraction Layer]
-        D -->|Fetch Pending| F{Jina Reader API?}
+        D -->|Fetch Pending Offers| F{Jina Reader API?}
         F -->|Success| G[Markdown Description]
-        F -->|Failure / Limit| H[Local HTML Fetch]
-        H -->|Cheerio Extract| G
+        F -->|Failure / Rate Limit| H[Direct HTML Fetch]
+        H -->|Cheerio Parser| G
     end
 
     subgraph Intelligence [3. Evaluation Layer]
         G --> DS[DeepSeek V4 Flash]
-        DS -->|Compare against profile brief| I{Score >= Threshold?}
-        I -->|Yes| J[Save as 'matched']
-        I -->|No| K[Save as 'rejected']
-        J -->|Write Status| D
-        K -->|Write Status| D
+        DS -->|Evaluate against CV Brief| I{Score >= Threshold?}
+        I -->|Yes| J[Status: 'matched']
+        I -->|No| K[Status: 'rejected']
+        J -->|Persist Decision| D
+        K -->|Persist Decision| D
     end
 
     subgraph Presentation [4. Presentation & Alert Layer]
-        D -->|Bidirectional Sync| L[(Notion Database)]
+        D -->|Bi-directional Sync| L[(Notion Database)]
         D -->|Local API Queries| M[Vite/Svelte Dashboard]
-        CLI[Scrape Runner] -->|Combined Digest & Health Heartbeat| R[Resend Email API]
+        CLI[Pipeline Runner] -->|Consolidated Digest & Health Telemetry| R[Resend Email API]
         R -->|HTML Newsletter| Inbox((Your Inbox))
     end
 ```
 
-## API Keys
+---
 
-Required for the core pipeline:
+## API Keys & Environment Variables
 
-- `DEEPSEEK_API_KEY`
+Required for core pipeline execution:
+- `DEEPSEEK_API_KEY`: Authentication key for DeepSeek V4 matching.
+- `DATABASE_URL`: PostgreSQL connection string (must use loopback in local dev).
 
 Optional:
+- `JINA_API_KEY`: Bearer token for Jina Reader. If omitted or exhausted, the pipeline falls back to Jina's keyless tier and then to the local Cheerio extractor.
+- `RESEND_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`: When configured, dispatches a consolidated HTML digest across all enabled profiles. Features daily heartbeat delivery (even on 0 matches) with an embedded Scraper Health Monitor widget.
+- `NOTION_TOKEN`, `NOTION_DATABASE_ID`: Required only if using Notion bi-directional synchronization.
 
-- `JINA_API_KEY`: If not configured, or if your key is out of credits/rate-limited, the pipeline automatically falls back to Jina's keyless free-tier and then to the built-in local Cheerio text parser.
-- `RESEND_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`: If configured, the pipeline compiles a styled HTML digest combining all enabled profiles and dispatches it via Resend. It provides guaranteed daily heartbeat delivery (even on 0 matches) with an embedded Scraper Health Monitor widget displaying adapter status and latency metrics.
-
-Required only if you use Notion sync or the bundled GitHub Actions workflow:
-
-- `NOTION_TOKEN`
-- `NOTION_DATABASE_ID`
-
-The same names are used for local env vars and GitHub Actions secrets.
+---
 
 ## Quick Setup
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Create local environment configuration and CV / match-brief files:
-
-```bash
-cp .env.example .env
-cp cv.example.md cv.md
-cp cv-ai.example.md cv-ai.md
-```
-
-> [!IMPORTANT]
-> `cv.md` and `cv-ai.md` are ignored by git to protect personal candidate data. When deploying to production (such as AWS EC2), manually provision these files on the server (e.g. via `scp`), or disable unprovisioned profiles in [`src/core/config.ts`](src/core/config.ts) (`enabled: false`) to prevent `ENOENT` pipeline crashes.
-
-Then:
-
-1. Fill `.env` with API keys and set `DATABASE_URL` to point to the PostgreSQL instance:
-   ```env
-   DATABASE_URL=postgres://jobetl_user:secure_password_here@localhost:5432/jobetl
+1. Install dependencies:
+   ```bash
+   npm install
    ```
-2. Edit profiles in [`src/core/config.ts`](src/core/config.ts): each profile defines `enabled`, `resumeMarkdownPath`, `matchThreshold`, `emailSubjectPrefix`, and source filters.
-3. Customize `cv.md` (software) and `cv-ai.md` (AI hybrid brief — see `cv-ai.example.md`).
-4. Start the local database container and apply migrations:
+
+2. Provision environment configuration and CV briefs:
+   ```bash
+   cp .env.example .env
+   cp cv.example.md cv.md
+   cp cv-ai.example.md cv-ai.md
+   ```
+
+   > [!IMPORTANT]
+   > Candidate brief files (`cv.md`, `cv-ai.md`) contain personal PII and are strictly excluded via `.gitignore`. When deploying to production servers, manually provision these files via secure transport (`scp`), or ensure unprovisioned profiles have `enabled: false` in [`src/core/config.ts`](src/core/config.ts) to prevent `ENOENT` pipeline halts.
+
+3. Configure `.env` with strong credentials. Never reuse default passwords:
+   ```env
+   # Bind strictly to 127.0.0.1 to avoid exposing the database across external interfaces
+   DATABASE_URL=postgres://jobetl_user:<your_strong_password>@127.0.0.1:5432/jobetl
+   ```
+
+4. Configure profiles in [`src/core/config.ts`](src/core/config.ts): configure `enabled`, `resumeMarkdownPath`, `matchThreshold`, `emailSubjectPrefix`, and source query parameters.
+
+5. Start the local database container and apply Drizzle migrations:
    ```bash
    npm run db:start
    npm run db:migrate
    ```
 
-## Run
+---
 
-Run smoke tests against scraper health and DOM selectors without LLM scoring or database writes:
+## Execution Commands
 
+### Scraper Health Smoke Testing
+Execute non-destructive HTTP and DOM parsing validation across all configured job boards without LLM scoring or database mutations:
 ```bash
 npm run check:sources
 ```
 
-Run all enabled profiles (`software` then `ai` by default), each with its configured sources:
-
+### Full Ingestion Pipeline
+Run all enabled profiles sequentially (`software` is enabled by default; `ai` executes only when `ai.enabled` is toggled to `true` in configuration):
 ```bash
 npm run dev
 ```
 
-Run a single profile and/or source:
-
+Target a specific profile and/or source adapter:
 ```bash
 npm run dev -- --profile software
-npm run dev -- --profile ai
-npm run dev -- --profile ai --source justjoinit
-npm run dev -- --source justjoinit
+npm run dev -- --profile software --source justjoinit
 npm run dev -- --source nofluffjobs
-npm run dev -- --source bulldogjob
-npm run dev -- --source pracujpl
-npm run dev -- --source thesmartjobs
 ```
 
-Jobs are tagged with `profile` (`software` | `ai` | `both` | null for legacy). Matching runs across all enabled profiles consolidate into a combined digest email with profile breakdown sections, delivered twice daily after the 11:00 and 19:00 cron runs.
-
-Review the best saved matches in the terminal:
-
+Review top matches directly in the terminal:
 ```bash
 npm run report
 ```
 
-Launch the interactive Svelte Web Dashboard:
+### Web Dashboard
+The dashboard provides interactive metrics (*Total Evaluated*, *Matched*, *Applied*, *Not Interested*, *Average Score*), status segment filtering, and a drawer view for offer inspection.
 
-```bash
-npm run dashboard   # API on :3001 + Vite UI on :3000
-```
+1. Generate the Argon2 password hash:
+   ```bash
+   npm run hash:password
+   ```
+   Save the resulting string into `DASHBOARD_PASSWORD_HASH` in `.env`. The API server refuses to boot if this hash is missing.
 
-The dashboard is password-protected. Generate the hash before first use:
+2. Launch API backend and Vite UI concurrently:
+   ```bash
+   npm run dashboard   # API on :3001 + Vite UI on :3000
+   ```
 
-```bash
-npm run hash:password   # prompts without echoing, prints a DASHBOARD_PASSWORD_HASH line for .env
-```
-
-The server refuses to start if `DASHBOARD_PASSWORD_HASH` is unset, so a
-misconfigured deployment fails loudly instead of serving a login nobody can pass.
-
-### Dashboard Features
-
-The Svelte-based dashboard provides:
-* **Interactive Metrics Grid:** Live tracking of *Total Evaluated*, *Matched*, *Applied*, *Not Interested*, *Avg Match Score*, and *Reject Rate*. Click the Total Evaluated, Matched, Applied, Not Interested, or Reject Rate cards to filter listings.
-* **Global Filter Synchronization:** Main navigation filters and sidebar status segments (Show, Hide, Only) sync bidirectionally.
-* **Drawer view:** Inspect details, toggle applied state (stores `appliedAt` timestamp), or mark as not interested.
-
-Optional Notion sync commands:
-
+Optional Notion synchronization:
 ```bash
 npm run import:notion
 npm run sync:notion
 ```
 
-## GitHub Actions
+---
 
-The repo includes two core workflows:
+## Production Deployment & Operational Security
 
-1. [`ci.yml`](.github/workflows/ci.yml): Continuous Integration.
-   - Trigger: `push` and `pull_request` to `master`.
-   - Pipeline: Enforces Prettier formatting, ESLint rules, TypeScript compilation, and Vitest suite execution.
-2. [`deploy.yml`](.github/workflows/deploy.yml): Continuous Deployment.
-   - Trigger: `push` to `master`.
-   - Pipeline: Connects to the AWS EC2 instance via SSH, pulls code changes, runs database migrations, compiles the build, and reloads PM2.
+In production, JobETL is deployed on a Linux cloud instance (e.g. AWS EC2) with automated CI/CD:
 
-## Deployment & Production Setup
-
-In production, the application runs on a cloud instance with automated delivery:
-
-- **Hosting**: AWS EC2 instance running Ubuntu.
-- **Process Manager**: PM2 manages background tasks and supervises the API server using `ecosystem.config.cjs`.
-- **Database**: PostgreSQL runs in a containerized environment (via `docker-compose.yml`) with Docker persistent volumes preserving job records.
-- **Scheduling (Cron)**: Executed twice daily at 11:00 and 19:00 in the host system's local timezone (e.g. `Europe/Warsaw`) via `crontab`. Output logs redirect to `/home/ubuntu/jobetl/logs/crawler.log`:
+- **Hosting & Isolation:** Ubuntu Linux. The Node.js application binds strictly to loopback (`127.0.0.1:3001`) and is supervised by **PM2** (`ecosystem.config.cjs`).
+- **TLS & Reverse Proxy:** Nginx terminates TLS, enforces HTTP security headers (HSTS, CSP, X-Frame-Options DENY), serves static bundles (`ui/dist`), and proxies `/api/*` to Node.js with IP-based rate limiting on `/api/login`.
+- **Database Security:** PostgreSQL runs in Docker. Port 5432 must never be bound to `0.0.0.0` or opened in cloud security groups.
+- **Scheduling (Cron):** Executed twice daily at 11:00 and 19:00 host local time via `crontab`. Output logs are captured in `logs/crawler.log`:
   ```text
   0 11,19 * * * . $HOME/.bashrc && cd /home/ubuntu/jobetl && npm run dev >> /home/ubuntu/jobetl/logs/crawler.log 2>&1
   ```
-  **Log Retention**: To prevent `crawler.log` from growing indefinitely and causing disk exhaustion, configure a `logrotate` entry at `/etc/logrotate.d/jobetl`:
+  **Log Rotation:** Configure `/etc/logrotate.d/jobetl` to prevent disk exhaustion:
   ```text
   /home/ubuntu/jobetl/logs/crawler.log {
       daily
@@ -237,22 +200,20 @@ In production, the application runs on a cloud instance with automated delivery:
       copytruncate
   }
   ```
-- **Continuous Deployment**: Managed by GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)). Pushing to `master` initiates an SSH connection to EC2, resets code, runs migrations, builds both backend and UI bundles, and reloads PM2 processes.
-- **Public dashboard**: Served at `https://jobetl.thedotfile.com` with nginx terminating TLS, serving `ui/dist` directly and proxying `/api/*` to the Node process on loopback. Full setup — DNS, certbot, nginx vhost, security headers, and the login throttle — is detailed in [deployment.md](deployment.md).
+- **Continuous Deployment:** Managed via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Pushes to `master` trigger SSH deployment, run migrations, compile UI/backend bundles, and execute zero-downtime PM2 reloads. Detailed infrastructure hardening is documented in [`deployment.md`](deployment.md).
 
-## Verify & Format
+---
 
-Before pushing changes, run the repository's mandatory pre-flight check:
+## Verification & Code Quality
+
+Before pushing commits, run the repository's mandatory pre-flight check:
 
 ```bash
 npm run check
 ```
 
-This sequentially runs Prettier formatting verification, ESLint static analysis, TypeScript compilation, and the Vitest test suite. Individual task commands:
-
-```bash
-npm run format         # Auto-format TypeScript, Svelte, and CSS files
-npm run lint           # Run ESLint rules
-npm test               # Run Vitest test suite
-npm run build          # Compile CLI bundle
-```
+This single command atomically runs:
+- Prettier code style validation (`npm run format:check`)
+- ESLint static analysis (`npm run lint`)
+- TypeScript production build (`npm run build`)
+- Vitest unit & integration test suites (`npm test`)
