@@ -455,7 +455,8 @@ describe("runPipeline", () => {
       rejected: 1,
       failed: 0,
       stored: 3,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(fetchOfferMarkdown).toHaveBeenCalledTimes(1);
     expect(fetchOfferMarkdown).toHaveBeenCalledWith(freshListing.url);
@@ -494,7 +495,8 @@ describe("runPipeline", () => {
       rejected: 0,
       failed: 0,
       stored: 2,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(loadResumeMarkdown).not.toHaveBeenCalled();
   });
@@ -585,7 +587,8 @@ describe("runPipeline", () => {
       rejected: 0,
       failed: 0,
       stored: 1,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(fetchOfferMarkdown).toHaveBeenCalledTimes(1);
     expect(scoreOffer).toHaveBeenCalledTimes(1);
@@ -620,7 +623,8 @@ describe("runPipeline", () => {
       rejected: 0,
       failed: 1,
       stored: 2,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(scoreOffer).toHaveBeenCalledTimes(2);
     expect(repository.jobs.get(brokenListing.externalId)?.status).toBe("error");
@@ -654,7 +658,8 @@ describe("runPipeline", () => {
       rejected: 0,
       failed: 1,
       stored: 2,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(fetchOfferMarkdown).toHaveBeenCalledTimes(2);
     expect(repository.jobs.get(brokenListing.externalId)?.status).toBe("error");
@@ -786,7 +791,8 @@ describe("runPipeline", () => {
       rejected: 0,
       failed: 0,
       stored: 2,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(snapshots.at(-1)).toEqual({
       stage: "done",
@@ -908,7 +914,8 @@ describe("runPipeline", () => {
       rejected: 0,
       failed: 0,
       stored: 3,
-      matchedCandidates: expect.any(Array)
+      matchedCandidates: expect.any(Array),
+      sourceReports: expect.any(Array)
     });
     expect(maxActiveFetches).toBe(2);
     expect(maxActiveScores).toBe(1);

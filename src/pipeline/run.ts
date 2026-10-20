@@ -10,14 +10,16 @@ import type { SelectedSource, SourceAdapterMap } from "@scrapers/types";
 import { PostgresJobRepository } from "@storage/postgres-job-repository";
 import { AsyncQueue } from "@pipeline/async-queue";
 import { shouldSkipJobForProfile } from "@pipeline/profile-skip";
-import type {
-  JobListing,
-  JobOffer,
-  JobSource,
-  JobStatus,
-  MatchCandidate,
-  MatchResult,
-  PipelineProgressSnapshot,
+import type { SourceCheckResult } from "@pipeline/check-sources";
+import {
+  JOB_SOURCES,
+  type JobListing,
+  type JobOffer,
+  type JobSource,
+  type JobStatus,
+  type MatchCandidate,
+  type MatchResult,
+  type PipelineProgressSnapshot,
   ProfileRunConfig,
   StoredJob
 } from "@core/types";
@@ -31,6 +33,7 @@ export interface RunSummary {
   failed: number;
   stored: number;
   matchedCandidates: MatchCandidate[];
+  sourceReports?: SourceCheckResult[];
 }
 
 export interface PipelineRepository {
@@ -75,7 +78,7 @@ function createProgressSnapshot(): PipelineProgressSnapshot {
   };
 }
 
-async function fetchText(url: string, init?: RequestInit): Promise<string> {
+export async function fetchText(url: string, init?: RequestInit): Promise<string> {
   const response = await fetch(url, init);
   if (!response.ok) {
     throw new Error(`Request failed for ${url} with ${response.status}`);
@@ -84,11 +87,59 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
   return response.text();
 }
 
-async function discoverSource(
+interface DiscoveredSourceResult {
+  source: JobSource;
+  listings: JobListing[];
+  report: SourceCheckResult;
+}
+
+async function discoverSourceSafe(
   selectedSource: SelectedSource,
-  fetchHtml: (url: string, init?: RequestInit) => Promise<string>
-): Promise<JobListing[]> {
-  return selectedSource.adapter.discoverListings(selectedSource.config, fetchHtml);
+  fetchHtml: (url: string, init?: RequestInit) => Promise<string>,
+  capturedWarnings: string[]
+): Promise<DiscoveredSourceResult> {
+  const start = performance.now();
+  try {
+    const listings = await selectedSource.adapter.discoverListings(
+      selectedSource.config,
+      fetchHtml
+    );
+    const latencyMs = Math.round(performance.now() - start);
+    const failurePattern = `[VALIDATION_FAILURE][${selectedSource.source}]`;
+    const validationFailures = capturedWarnings.filter((w) => w.includes(failurePattern)).length;
+    const status = listings.length === 0 ? ("degraded" as const) : ("ok" as const);
+    return {
+      source: selectedSource.source,
+      listings,
+      report: {
+        source: selectedSource.source,
+        status,
+        listings: listings.length,
+        latencyMs,
+        validationFailures
+      }
+    };
+  } catch (error) {
+    const latencyMs = Math.round(performance.now() - start);
+    const failurePattern = `[VALIDATION_FAILURE][${selectedSource.source}]`;
+    const validationFailures = capturedWarnings.filter((w) => w.includes(failurePattern)).length;
+    console.error(
+      `Failed to discover listings for source ${selectedSource.source}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    return {
+      source: selectedSource.source,
+      listings: [],
+      report: {
+        source: selectedSource.source,
+        status: "error" as const,
+        listings: 0,
+        latencyMs,
+        validationFailures,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    };
+  }
 }
 
 function dedupeListings(listings: JobListing[]): JobListing[] {
@@ -190,11 +241,40 @@ export async function runPipeline(
       progress[method](progressSnapshot);
     };
     const selectedSources = selectSources(config, dependencies.adapters, options.source);
-    const discoveredListings = await Promise.all(
-      selectedSources.map((selectedSource) =>
-        discoverSource(selectedSource, dependencies.fetchListingHtml)
-      )
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+      originalWarn(...args);
+    };
+
+    let discoveryResults: DiscoveredSourceResult[];
+    try {
+      discoveryResults = await Promise.all(
+        selectedSources.map((selectedSource) =>
+          discoverSourceSafe(selectedSource, dependencies.fetchListingHtml, warnings)
+        )
+      );
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    const sourceReportsMap = new Map<JobSource, SourceCheckResult>(
+      discoveryResults.map((r) => [r.source, r.report])
     );
+    const sourceReports: SourceCheckResult[] = JOB_SOURCES.map((source) => {
+      return (
+        sourceReportsMap.get(source) ?? {
+          source,
+          status: "skipped" as const,
+          listings: 0,
+          latencyMs: 0,
+          validationFailures: 0
+        }
+      );
+    });
+
+    const discoveredListings = discoveryResults.map((r) => r.listings);
     const listings = dedupeListings(discoveredListings.flat());
     snapshot.discovered = listings.length;
     emitSnapshot("start");
@@ -214,7 +294,8 @@ export async function runPipeline(
       rejected: 0,
       failed: 0,
       stored: 0,
-      matchedCandidates: []
+      matchedCandidates: [],
+      sourceReports
     };
     const listingsToProcess: JobListing[] = [];
 
