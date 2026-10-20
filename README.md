@@ -166,7 +166,7 @@ npm run dev -- --source pracujpl
 npm run dev -- --source thesmartjobs
 ```
 
-Jobs are tagged with `profile` (`software` | `ai` | `both` | null for legacy). Matching runs across all enabled profiles consolidate into a single daily digest email with profile breakdown sections.
+Jobs are tagged with `profile` (`software` | `ai` | `both` | null for legacy). Matching runs across all enabled profiles consolidate into a combined digest email with profile breakdown sections, delivered twice daily after the 11:00 and 19:00 cron runs.
 
 Review the best saved matches in the terminal:
 
@@ -248,7 +248,7 @@ Before pushing changes, run the repository's mandatory pre-flight check:
 npm run check
 ```
 
-This atomically runs Prettier formatting verification, ESLint static analysis, TypeScript compilation, and the Vitest test suite. Individual task commands:
+This sequentially runs Prettier formatting verification, ESLint static analysis, TypeScript compilation, and the Vitest test suite. Individual task commands:
 
 ```bash
 npm run format         # Auto-format TypeScript, Svelte, and CSS files
