@@ -41,8 +41,8 @@ The pipeline uses a decoupled, four-tier architecture designed for speed, resili
 - DeepSeek provides high reasoning accuracy at minimal token cost, allowing high-throughput candidate evaluation without excessive API overhead.
 
 ### 4. Storage & State Management (PostgreSQL + Drizzle ORM)
-- **PostgreSQL** runs in a Docker container with persistent named volumes to prevent duplicate ingestion across runs.
-- **Drizzle ORM** enforces end-to-end TypeScript schema safety, eliminating runtime SQL type mismatches and query syntax errors.
+- **PostgreSQL** runs in a Docker container with persistent named volumes to maintain data across container lifecycles. Deduplication is handled at the application and schema layer by checking job URLs and source IDs against existing records, preventing duplicate processing across subsequent runs.
+- **Drizzle ORM** enforces compile-time TypeScript schema safety across queries and migrations, significantly reducing SQL type mismatches and syntax errors.
 
 ---
 
@@ -91,7 +91,7 @@ Required for core pipeline execution:
 
 Optional:
 - `JINA_API_KEY`: Bearer token for Jina Reader. If omitted or exhausted, the pipeline falls back to Jina's keyless tier and then to the local Cheerio extractor.
-- `RESEND_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`: Dispatches a consolidated HTML digest across all enabled profiles. Features guaranteed daily heartbeat delivery (even on 0 matches) with an embedded Scraper Health Monitor widget.
+- `RESEND_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`: When configured, dispatches a consolidated HTML digest across all enabled profiles. Features daily heartbeat delivery (even on 0 matches) with an embedded Scraper Health Monitor widget.
 - `NOTION_TOKEN`, `NOTION_DATABASE_ID`: Required only if using Notion bi-directional synchronization.
 
 ---
@@ -138,7 +138,7 @@ npm run check:sources
 ```
 
 ### Full Ingestion Pipeline
-Run all enabled profiles (`software`, `ai`) sequentially:
+Run all enabled profiles sequentially (`software` is enabled by default; `ai` executes only when `ai.enabled` is toggled to `true` in configuration):
 ```bash
 npm run dev
 ```
