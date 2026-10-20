@@ -14,7 +14,7 @@
     "dev": "tsx src/cli.ts scrape",
     "test:email": "tsx src/scripts/test-email.ts",
     "hash:password": "tsx --no-deprecation src/scripts/generate-password-hash.ts",
-    "test:scrapers": "tsx src/scripts/test-scrapers.ts",
+    "check:sources": "tsx src/cli.ts check-sources",
     "dev:ui": "vite",
     "build:ui": "vite build",
     "report": "tsx src/cli.ts report",

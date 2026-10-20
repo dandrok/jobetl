@@ -59,16 +59,29 @@ export class NoFluffJobsAdapter implements SourceAdapter<"nofluffjobs"> {
       const href = $(element).attr("href");
       const rawTitle = cleanText($(element).find("h3").first().text()) ?? "";
       const title = rawTitle.replace(/\s+NOWA$/u, "");
-      const company = cleanText($(element).find("h4").first().text());
+      const company =
+        cleanText($(element).find("h4").first().text()) ||
+        cleanText($(element).find('inline-icon[commonicon="job_offer"]').parent().text());
       const salaryText = $(element)
         .find("div, span")
         .map((__, child) => cleanText($(child).text()))
         .get()
         .find((value): value is string => Boolean(value) && isSalaryText(value));
 
-      const location = normalizeLocation(
-        $(element).find("h4").first().nextAll("div, span").first().text()
-      );
+      const rawLocation =
+        cleanText(
+          $(element).find('[data-cy="location on the job offer listing"]').first().text()
+        ) ||
+        cleanText(
+          $(element)
+            .find('inline-icon[maticon="location_on_outline"]')
+            .parent()
+            .find(".tw-truncate")
+            .first()
+            .text()
+        ) ||
+        cleanText($(element).find("h4").first().nextAll("div, span").first().text());
+      const location = normalizeLocation(rawLocation);
 
       if (!href) {
         return;
