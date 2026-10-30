@@ -109,7 +109,7 @@ export const config: RunConfig = {
       sources: softwareSources
     },
     ai: {
-      enabled: false, // TODO: disabled for now
+      enabled: true,
       resumeMarkdownPath: "./cv-ai.md",
       matchThreshold: 0.75,
       emailSubjectPrefix: "JobETL [ai]",
