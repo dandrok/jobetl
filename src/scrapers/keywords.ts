@@ -3,14 +3,29 @@ export interface KeywordFilter {
   keywords?: string[];
 }
 
+export interface KeywordResolutionOptions {
+  /**
+   * Dedupe terms case-insensitively. Defaults to true because most boards
+   * treat differently-cased search terms as the same query. Sources with
+   * case-sensitive skill slugs (Bulldogjob) pass false so distinct terms can
+   * select different skills.
+   */
+  caseInsensitive?: boolean;
+}
+
 /**
  * Resolve the configured search terms for a source.
  *
  * `keywords` is the preferred config shape. `keyword` stays supported so old
  * configs (and callers building a single-term filter) keep working. Terms are
- * trimmed, empty entries dropped, and duplicates removed case-insensitively.
+ * trimmed, empty entries dropped, and duplicates removed according to
+ * `options.caseInsensitive`.
  */
-export function resolveSearchKeywords(filters: KeywordFilter): string[] {
+export function resolveSearchKeywords(
+  filters: KeywordFilter,
+  options: KeywordResolutionOptions = {}
+): string[] {
+  const caseInsensitive = options.caseInsensitive ?? true;
   const configured = filters.keywords?.length
     ? filters.keywords
     : filters.keyword
@@ -21,7 +36,7 @@ export function resolveSearchKeywords(filters: KeywordFilter): string[] {
 
   for (const value of configured) {
     const term = value.trim();
-    const key = term.toLowerCase();
+    const key = caseInsensitive ? term.toLowerCase() : term;
 
     if (!term || seen.has(key)) {
       continue;

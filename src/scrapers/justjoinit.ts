@@ -124,6 +124,7 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
       configuredTerms.length > 0 ? configuredTerms : [undefined];
     const offers = new Map<string, JobListing>();
     const maxPagesPerKeyword = 20;
+    let lastFetchError: unknown;
 
     for (let termIndex = 0; termIndex < searchTerms.length; termIndex += 1) {
       if (offers.size >= config.maxListings) {
@@ -146,7 +147,22 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
         page += 1
       ) {
         const url = this.buildSearchUrl({ ...config.filters, keyword: term }, config.baseUrl, page);
-        const html = await fetchHtml(url);
+        let html: string;
+        try {
+          html = await fetchHtml(url);
+        } catch (error) {
+          // Try the remaining keywords before giving up: one failing term
+          // must not prevent a later term from yielding listings. If nothing
+          // is collected at the end, the last error is rethrown so the source
+          // report still reflects a completely failed discovery.
+          lastFetchError = error;
+          console.warn(
+            `\n[JUSTJOINIT] Failed to fetch ${url} for keyword "${term ?? "(default)"}"; moving to the next keyword.`,
+            error instanceof Error ? error.message : String(error)
+          );
+          break;
+        }
+
         const pageOffers = this.parseListings(html, config.baseUrl);
 
         if (pageOffers.length === 0) {
@@ -180,6 +196,10 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
           break;
         }
       }
+    }
+
+    if (offers.size === 0 && lastFetchError !== undefined) {
+      throw lastFetchError;
     }
 
     const allOffers = [...offers.values()];

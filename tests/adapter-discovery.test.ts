@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { BulldogjobAdapter } from "@scrapers/bulldogjob";
 import { JustJoinItAdapter } from "@scrapers/justjoinit";
 import { NoFluffJobsAdapter } from "@scrapers/nofluffjobs";
 import { PracujPlAdapter } from "@scrapers/pracujpl";
 import { listingsPerKeyword, resolveSearchKeywords } from "@scrapers/keywords";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function justJoinItCard(slug: string, title: string, company: string): string {
   return `
@@ -66,6 +70,12 @@ describe("resolveSearchKeywords", () => {
       "React",
       "TypeScript"
     ]);
+  });
+
+  test("can keep case-distinct terms for case-sensitive sources", () => {
+    expect(
+      resolveSearchKeywords({ keywords: ["React", "react"] }, { caseInsensitive: false })
+    ).toEqual(["React", "react"]);
   });
 
   test("returns an empty list when nothing is configured", () => {
@@ -248,6 +258,88 @@ describe("JustJoinItAdapter discovery", () => {
     ]);
     expect(offers).toHaveLength(1);
   });
+
+  test("keeps collected listings when a later page fetch fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const adapter = new JustJoinItAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url === "https://justjoin.it/job-offers/all-locations?keyword=javascript") {
+        return justJoinItCard("survives-failure", "Survives Failure", "Acme");
+      }
+      if (url === "https://justjoin.it/job-offers/all-locations?keyword=javascript&page=2") {
+        throw new Error("network down");
+      }
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://justjoin.it",
+        maxListings: 2,
+        filters: { keyword: "javascript" }
+      },
+      fetchHtml
+    );
+
+    expect(offers).toHaveLength(1);
+    expect(offers[0].externalId).toBe("justjoinit:/job-offer/survives-failure");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[JUSTJOINIT] Failed to fetch"),
+      "network down"
+    );
+  });
+
+  test("tries later keywords after an earlier keyword fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const adapter = new JustJoinItAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url === "https://justjoin.it/job-offers/all-locations?keyword=failing-term") {
+        throw new Error("temporary outage");
+      }
+      if (url === "https://justjoin.it/job-offers/all-locations?keyword=valid-term") {
+        return justJoinItCard("valid-role", "Valid Role", "Acme");
+      }
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://justjoin.it",
+        maxListings: 1,
+        filters: { keywords: ["failing-term", "valid-term"] }
+      },
+      fetchHtml
+    );
+
+    expect(fetchHtml).toHaveBeenCalledTimes(2);
+    expect(offers).toHaveLength(1);
+    expect(offers[0].externalId).toBe("justjoinit:/job-offer/valid-role");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[JUSTJOINIT] Failed to fetch"),
+      "temporary outage"
+    );
+  });
+
+  test("propagates a fetch failure when nothing has been collected", async () => {
+    const adapter = new JustJoinItAdapter();
+    const fetchHtml = vi.fn(async () => {
+      throw new Error("network down");
+    });
+
+    await expect(
+      adapter.discoverListings(
+        {
+          enabled: true,
+          baseUrl: "https://justjoin.it",
+          maxListings: 2,
+          filters: { keyword: "javascript" }
+        },
+        fetchHtml
+      )
+    ).rejects.toThrow("network down");
+  });
 });
 
 describe("NoFluffJobsAdapter discovery", () => {
@@ -372,6 +464,32 @@ describe("BulldogjobAdapter discovery", () => {
       "https://bulldogjob.com/companies/jobs/s/skills,React"
     ]);
     expect(offers.map((offer) => offer.title)).toEqual(["JavaScript Developer", "React Developer"]);
+  });
+
+  test("searches case-distinct terms for case-sensitive skill slugs", async () => {
+    const adapter = new BulldogjobAdapter();
+    const fetchHtml = vi.fn(async (url: string) => {
+      if (url === "https://bulldogjob.com/companies/jobs/s/skills,React") {
+        return bulldogCard(101, "React Developer", "ReactCo");
+      }
+      if (url === "https://bulldogjob.com/companies/jobs/s/skills,react") {
+        return bulldogCard(102, "react Developer", "reactCo");
+      }
+      throw new Error(`Unexpected url: ${url}`);
+    });
+
+    const offers = await adapter.discoverListings(
+      {
+        enabled: true,
+        baseUrl: "https://bulldogjob.com",
+        maxListings: 2,
+        filters: { keywords: ["React", "react"] }
+      },
+      fetchHtml
+    );
+
+    expect(fetchHtml).toHaveBeenCalledTimes(2);
+    expect(offers).toHaveLength(2);
   });
 
   test("throws when no keyword is configured", async () => {

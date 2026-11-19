@@ -99,7 +99,7 @@ export class BulldogjobAdapter implements SourceAdapter<"bulldogjob"> {
     config: SourceConfig<BulldogjobSearchFilters>,
     fetchHtml: (url: string) => Promise<string>
   ): Promise<JobListing[]> {
-    const searchTerms = resolveSearchKeywords(config.filters);
+    const searchTerms = resolveSearchKeywords(config.filters, { caseInsensitive: false });
     if (searchTerms.length === 0) {
       throw new Error("Bulldogjob requires filters.keyword or filters.keywords");
     }
