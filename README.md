@@ -119,7 +119,7 @@ Optional:
    DATABASE_URL=postgres://jobetl_user:<your_strong_password>@127.0.0.1:5432/jobetl
    ```
 
-4. Configure profiles in [`src/core/config.ts`](src/core/config.ts): configure `enabled`, `resumeMarkdownPath`, `matchThreshold`, `emailSubjectPrefix`, and source query parameters.
+4. Configure profiles in [`src/core/config.ts`](src/core/config.ts): configure `enabled`, `resumeMarkdownPath`, `matchThreshold`, `emailSubjectPrefix`, and source query parameters. Source filters accept `keywords` (an array, preferred) or `keyword` (legacy single term). `maxListings` is the total budget per source and is split evenly across the configured terms, so adding terms broadens coverage without multiplying the scoring volume.
 
 5. Start the local database container and apply Drizzle migrations:
    ```bash
