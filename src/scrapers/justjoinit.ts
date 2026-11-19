@@ -4,6 +4,7 @@ import type { JobListing, JustJoinItSearchFilters, SourceConfig } from "@core/ty
 import { JobListingSchema } from "@core/types";
 import { Telemetry } from "@core/telemetry";
 import type { SourceAdapter } from "@scrapers/types";
+import { listingsPerKeyword, resolveSearchKeywords } from "@scrapers/keywords";
 
 const JUSTJOINIT_ROOT = "https://justjoin.it";
 const LEAD_BADGES = new Set(["Super offer", "1-click Apply", "New"]);
@@ -79,7 +80,7 @@ function extractLeafTexts(
 export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
   readonly source = "justjoinit" as const;
 
-  buildSearchUrl(filters: JustJoinItSearchFilters, baseUrl = JUSTJOINIT_ROOT): string {
+  buildSearchUrl(filters: JustJoinItSearchFilters, baseUrl = JUSTJOINIT_ROOT, page = 1): string {
     const url = new URL("/job-offers/all-locations", baseUrl);
 
     if (filters.keyword) {
@@ -106,6 +107,9 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
     if (filters.withSalaryOnly) {
       url.searchParams.set("with-salary", "true");
     }
+    if (page > 1) {
+      url.searchParams.set("page", String(page));
+    }
 
     return url.toString();
   }
@@ -114,9 +118,71 @@ export class JustJoinItAdapter implements SourceAdapter<"justjoinit"> {
     config: SourceConfig<JustJoinItSearchFilters>,
     fetchHtml: (url: string) => Promise<string>
   ): Promise<JobListing[]> {
-    const html = await fetchHtml(this.buildSearchUrl(config.filters, config.baseUrl));
+    const configuredTerms = resolveSearchKeywords(config.filters);
+    // No terms configured means one unfiltered pass (the site's default feed).
+    const searchTerms: Array<string | undefined> =
+      configuredTerms.length > 0 ? configuredTerms : [undefined];
+    const offers = new Map<string, JobListing>();
+    const maxPagesPerKeyword = 20;
 
-    const allOffers = this.parseListings(html, config.baseUrl);
+    for (let termIndex = 0; termIndex < searchTerms.length; termIndex += 1) {
+      if (offers.size >= config.maxListings) {
+        break;
+      }
+
+      const term = searchTerms[termIndex];
+      const perKeywordLimit = listingsPerKeyword(
+        config.maxListings - offers.size,
+        searchTerms.length - termIndex
+      );
+      const seenForTerm = new Set<string>();
+      let keywordListings = 0;
+
+      for (
+        let page = 1;
+        keywordListings < perKeywordLimit &&
+        offers.size < config.maxListings &&
+        page <= maxPagesPerKeyword;
+        page += 1
+      ) {
+        const url = this.buildSearchUrl({ ...config.filters, keyword: term }, config.baseUrl, page);
+        const html = await fetchHtml(url);
+        const pageOffers = this.parseListings(html, config.baseUrl);
+
+        if (pageOffers.length === 0) {
+          break;
+        }
+
+        let newForTerm = 0;
+        for (const offer of pageOffers) {
+          if (seenForTerm.has(offer.externalId)) {
+            continue;
+          }
+          seenForTerm.add(offer.externalId);
+          newForTerm += 1;
+
+          if (keywordListings >= perKeywordLimit || offers.size >= config.maxListings) {
+            continue;
+          }
+          if (offers.has(offer.externalId)) {
+            continue;
+          }
+
+          offers.set(offer.externalId, offer);
+          keywordListings += 1;
+        }
+
+        // Stop only when a page has nothing new for THIS term: that means
+        // pagination wrapped or the site ignored `page`. A page full of jobs
+        // already collected by earlier keywords is normal and must not stop
+        // the scan.
+        if (newForTerm === 0) {
+          break;
+        }
+      }
+    }
+
+    const allOffers = [...offers.values()];
     if (allOffers.length === 0) {
       Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
     }

@@ -4,6 +4,7 @@ import type { JobListing, PracujPlSearchFilters, SourceConfig } from "@core/type
 import { JobListingSchema } from "@core/types";
 import { Telemetry } from "@core/telemetry";
 import type { SourceAdapter } from "@scrapers/types";
+import { listingsPerKeyword, resolveSearchKeywords } from "@scrapers/keywords";
 
 function cleanText(value?: string): string | undefined {
   const normalized = value?.replace(/\s+/g, " ").trim();
@@ -104,33 +105,83 @@ export class PracujPlAdapter implements SourceAdapter<"pracujpl"> {
     config: SourceConfig<PracujPlSearchFilters>,
     fetchHtml: (url: string, init?: RequestInit) => Promise<string>
   ): Promise<JobListing[]> {
-    const offers: JobListing[] = [];
+    const configuredTerms = resolveSearchKeywords(config.filters);
+    const searchTerms: Array<string | undefined> =
+      configuredTerms.length > 0 ? configuredTerms : [undefined];
+    const offers = new Map<string, JobListing>();
+    const maxPagesPerKeyword = 20;
 
-    for (let page = 1; offers.length < config.maxListings; page += 1) {
-      const targetUrl = this.buildSearchUrl(config.filters, config.baseUrl, page);
-      const jinaUrl = `https://r.jina.ai/${encodeURIComponent(targetUrl)}`;
-
-      const html = await fetchHtml(jinaUrl, {
-        headers: { "x-return-format": "html" }
-      });
-      const pageOffers = this.parseListings(html, config.baseUrl);
-
-      if (pageOffers.length === 0) {
+    for (let termIndex = 0; termIndex < searchTerms.length; termIndex += 1) {
+      if (offers.size >= config.maxListings) {
         break;
       }
 
-      offers.push(...pageOffers);
+      const term = searchTerms[termIndex];
+      const perKeywordLimit = listingsPerKeyword(
+        config.maxListings - offers.size,
+        searchTerms.length - termIndex
+      );
+      const seenForTerm = new Set<string>();
+      let keywordListings = 0;
 
-      // Stop if there are no more pages
-      if (pageOffers.length < 10) {
-        break;
+      for (
+        let page = 1;
+        keywordListings < perKeywordLimit &&
+        offers.size < config.maxListings &&
+        page <= maxPagesPerKeyword;
+        page += 1
+      ) {
+        const targetUrl = this.buildSearchUrl(
+          { ...config.filters, keyword: term },
+          config.baseUrl,
+          page
+        );
+        const jinaUrl = `https://r.jina.ai/${encodeURIComponent(targetUrl)}`;
+
+        const html = await fetchHtml(jinaUrl, {
+          headers: { "x-return-format": "html" }
+        });
+        const pageOffers = this.parseListings(html, config.baseUrl);
+
+        if (pageOffers.length === 0) {
+          break;
+        }
+
+        let newForTerm = 0;
+        for (const offer of pageOffers) {
+          if (seenForTerm.has(offer.externalId)) {
+            continue;
+          }
+          seenForTerm.add(offer.externalId);
+          newForTerm += 1;
+
+          if (keywordListings >= perKeywordLimit || offers.size >= config.maxListings) {
+            continue;
+          }
+          if (offers.has(offer.externalId)) {
+            continue;
+          }
+
+          offers.set(offer.externalId, offer);
+          keywordListings += 1;
+        }
+
+        if (newForTerm === 0) {
+          break;
+        }
+
+        // Stop if there are no more pages
+        if (pageOffers.length < 10) {
+          break;
+        }
       }
     }
 
-    if (offers.length === 0) {
+    const allOffers = [...offers.values()];
+    if (allOffers.length === 0) {
       Telemetry.recordScrapeZeroYield(this.source, config.baseUrl);
     }
-    const finalOffers = offers.slice(0, config.maxListings);
+    const finalOffers = allOffers.slice(0, config.maxListings);
     const scrapeTime = Date.now();
 
     return finalOffers.map((offer, index) => ({

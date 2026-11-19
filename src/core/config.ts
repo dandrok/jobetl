@@ -5,13 +5,28 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set.");
 }
 
+// Search terms are title/skill driven on most boards, so one broad term is not
+// enough. Each source splits its maxListings budget across these terms.
+const softwareKeywords = ["javascript", "typescript", "react", "node.js", "frontend", "fullstack"];
+// Bulldogjob's skill slugs are case-sensitive and expect display casing.
+const softwareBulldogjobKeywords = [
+  "JavaScript",
+  "TypeScript",
+  "React",
+  "Node.js",
+  "Frontend",
+  "Fullstack"
+];
+const aiKeywords = ["llm", "ai", "genai", "machine learning"];
+const aiBulldogjobKeywords = ["LLM", "AI", "GenAI"];
+
 const softwareSources: SourceConfigMap = {
   justjoinit: {
     enabled: true,
     baseUrl: "https://justjoin.it",
     maxListings: 200,
     filters: {
-      keyword: "javascript",
+      keywords: softwareKeywords,
       withSalaryOnly: false
     }
   },
@@ -20,7 +35,7 @@ const softwareSources: SourceConfigMap = {
     baseUrl: "https://nofluffjobs.com",
     maxListings: 200,
     filters: {
-      keyword: "javascript"
+      keywords: softwareKeywords
     }
   },
   bulldogjob: {
@@ -28,7 +43,7 @@ const softwareSources: SourceConfigMap = {
     baseUrl: "https://bulldogjob.com",
     maxListings: 200,
     filters: {
-      keyword: "JavaScript"
+      keywords: softwareBulldogjobKeywords
     }
   },
   pracujpl: {
@@ -36,7 +51,7 @@ const softwareSources: SourceConfigMap = {
     baseUrl: "https://it.pracuj.pl",
     maxListings: 200,
     filters: {
-      keyword: "javascript"
+      keywords: softwareKeywords
     }
   },
   thesmartjobs: {
@@ -56,7 +71,7 @@ const aiSources: SourceConfigMap = {
     baseUrl: "https://justjoin.it",
     maxListings: 200,
     filters: {
-      keyword: "llm",
+      keywords: aiKeywords,
       withSalaryOnly: false
     }
   },
@@ -65,7 +80,7 @@ const aiSources: SourceConfigMap = {
     baseUrl: "https://nofluffjobs.com",
     maxListings: 200,
     filters: {
-      keyword: "llm"
+      keywords: aiKeywords
     }
   },
   bulldogjob: {
@@ -73,7 +88,7 @@ const aiSources: SourceConfigMap = {
     baseUrl: "https://bulldogjob.com",
     maxListings: 200,
     filters: {
-      keyword: "GenAI"
+      keywords: aiBulldogjobKeywords
     }
   },
   pracujpl: {
@@ -81,7 +96,7 @@ const aiSources: SourceConfigMap = {
     baseUrl: "https://it.pracuj.pl",
     maxListings: 200,
     filters: {
-      keyword: "llm"
+      keywords: aiKeywords
     }
   },
   thesmartjobs: {

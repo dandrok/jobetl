@@ -91,7 +91,10 @@ export interface StoredJob {
 }
 
 export interface JustJoinItSearchFilters {
+  /** Single-term search (legacy). Prefer `keywords` for new configs. */
   keyword?: string;
+  /** Search terms for this source. Budget is split across them via maxListings. */
+  keywords?: string[];
   categorySlug?: string;
   location?: string;
   workingMode?: "remote" | "hybrid" | "office";
@@ -102,16 +105,25 @@ export interface JustJoinItSearchFilters {
 }
 
 export interface NoFluffJobsSearchFilters {
+  /** Single-term search (legacy). Prefer `keywords` for new configs. */
   keyword?: string;
+  /** Search terms for this source. Budget is split across them via maxListings. */
+  keywords?: string[];
   location?: string;
 }
 
 export interface BulldogjobSearchFilters {
+  /** Single-term search (legacy). Prefer `keywords` for new configs. */
   keyword?: string;
+  /** Search terms for this source. Budget is split across them via maxListings. */
+  keywords?: string[];
 }
 
 export interface PracujPlSearchFilters {
+  /** Single-term search (legacy). Prefer `keywords` for new configs. */
   keyword?: string;
+  /** Search terms for this source. Budget is split across them via maxListings. */
+  keywords?: string[];
   location?: string;
 }
 
